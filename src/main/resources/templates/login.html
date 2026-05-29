@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng Nhập - LiteFlow POS</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            background: #060911;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .login-container {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        @media (max-width: 992px) {
+            .login-container {
+                grid-template-columns: 1fr;
+            }
+            .left-panel {
+                display: none;
+            }
+        }
+
+        /* Left Panel / Carousel Section */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            padding: 60px 80px 80px 80px;
+            background: radial-gradient(circle at 85% 20%, rgba(99, 102, 241, 0.22) 0%, transparent 50%),
+                        radial-gradient(circle at 15% 85%, rgba(6, 182, 212, 0.2) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(244, 63, 94, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.12) 0%, transparent 65%),
+                        linear-gradient(145deg, #050811 0%, #030408 45%, #0b0718 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.03);
+            position: relative;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .brand-section {
+            margin-bottom: 30px;
+        }
+
+        .welcome-title {
+            font-size: 52px;
+            font-weight: 800;
+            color: white;
+            line-height: 1.1;
+            letter-spacing: -1px;
+        }
+
+        .title-line {
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, #00e5ff 0%, #6366f1 50%, #f43f5e 100%);
+            border-radius: 2px;
+            margin-top: 15px;
+        }
+
+        .welcome-subtitle {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-top: 20px;
+        }
+
+        /* Centered Carousel Container Wrapper */
+        .carousel-outer-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            width: 100%;
+        }
+
+        .carousel-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            width: 100%;
+        }
+
+        .carousel-card {
+            width: 420px;
+            height: 360px;
+            background: rgba(8, 12, 24, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 28px;
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .carousel-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 28px;
+            padding: 1.5px;
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(99, 102, 241, 0.1) 40%, rgba(244, 63, 94, 0.1) 70%, rgba(6, 182, 212, 0.25) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            transition: background 0.4s ease;
+        }
+
+        .carousel-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55), 0 0 30px rgba(6, 182, 212, 0.1);
+        }
+
+        .carousel-card:hover::before {
+            background: linear-gradient(135deg, #00e5ff 0%, #6366f1 50%, #f43f5e 100%);
+        }
+
+        .carousel-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: #9ca3af;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+
+        .carousel-btn:hover {
+            background: rgba(6, 182, 212, 0.12);
+            border-color: rgba(6, 182, 212, 0.4);
+            color: #00e5ff;
+            transform: scale(1.08);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.25);
+        }
+
+        .slide {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            animation: slideFade 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes slideFade {
+            from { opacity: 0; transform: translateY(12px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .slide-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        .slide-desc {
+            font-size: 13.5px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            max-width: 280px;
+        }
+
+        /* Pill shape indicator dots at the bottom */
+        .carousel-dots {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 30px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dot.active {
+            width: 24px;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #00e5ff, #6366f1);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+        }
+
+        /* Dynamic SVG Icon Animations */
+        .icon-container {
+            width: 90px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .animated-icon {
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.15));
+        }
+
+        /* Slide 1: Fast checkout (Cart) */
+        .wheel-1, .wheel-2 {
+            transform-origin: 9px 21px;
+            animation: spinWheel 2s infinite linear;
+        }
+        .wheel-2 {
+            transform-origin: 20px 21px;
+        }
+        @keyframes spinWheel {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .cart-icon {
+            animation: bounceCart 2s infinite ease-in-out;
+        }
+        @keyframes bounceCart {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .wave {
+            stroke: #00e5ff;
+            stroke-dasharray: 8;
+            animation: wavePulse 1.5s infinite ease-in-out;
+        }
+        .wave-2 {
+            animation-delay: 0.3s;
+        }
+        @keyframes wavePulse {
+            0% { opacity: 0; stroke-dashoffset: 8; }
+            50% { opacity: 1; }
+            100% { opacity: 0; stroke-dashoffset: 0; }
+        }
+
+        /* Slide 2: Smart Inventory (Box) */
+        .box-icon {
+            animation: floatBox 3s infinite ease-in-out;
+        }
+        @keyframes floatBox {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(1.5deg); }
+        }
+        .box-lid {
+            animation: openBoxLid 3s infinite ease-in-out;
+            transform-origin: 24px 2px;
+        }
+        @keyframes openBoxLid {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        .particle {
+            animation: riseParticle 2s infinite ease-in-out;
+            opacity: 0;
+        }
+        .particle-1 { animation-delay: 0.2s; }
+        .particle-2 { animation-delay: 0.8s; }
+        @keyframes riseParticle {
+            0% { transform: translateY(8px) scale(0.6); opacity: 0; }
+            50% { opacity: 0.7; }
+            100% { transform: translateY(-16px) scale(1.1); opacity: 0; }
+        }
+
+        /* Slide 3: Sales Analysis (Chart) */
+        .bar-1 { animation: scaleBar1 2.2s infinite ease-in-out; }
+        .bar-2 { animation: scaleBar2 1.8s infinite ease-in-out; }
+        .bar-3 { animation: scaleBar3 2s infinite ease-in-out; }
+        @keyframes scaleBar1 { 0%, 100% { height: 32px; y: 32px; } 50% { height: 44px; y: 20px; } }
+        @keyframes scaleBar2 { 0%, 100% { height: 20px; y: 44px; } 50% { height: 12px; y: 52px; } }
+        @keyframes scaleBar3 { 0%, 100% { height: 40px; y: 24px; } 50% { height: 48px; y: 16px; } }
+        .chart-line {
+            stroke-dasharray: 60;
+            stroke-dashoffset: 60;
+            animation: paintLine 3s infinite ease-in-out;
+        }
+        @keyframes paintLine {
+            0% { stroke-dashoffset: 60; }
+            50% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: -60; }
+        }
+
+        /* Slide 4: Multi-channel (Globe) */
+        .globe-icon {
+            animation: rotateGlobe 16s infinite linear;
+        }
+        @keyframes rotateGlobe {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .globe-axis {
+            animation: breatheAxis 3s infinite ease-in-out;
+        }
+        @keyframes breatheAxis {
+            0%, 100% { transform: scaleX(1); }
+            50% { transform: scaleX(0.85); }
+        }
+        .globe-dot {
+            animation: pulseDot 2s infinite ease-in-out;
+        }
+        .globe-dot-2 { animation-delay: 1s; }
+        @keyframes pulseDot {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.3); }
+        }
+
+
+        /* Right Panel / Login Form Section */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 80px;
+            background: rgba(10, 14, 23, 0.4);
+            position: relative;
+        }
+
+        @media (max-width: 576px) {
+            .right-panel {
+                padding: 40px 24px;
+            }
+        }
+
+        .login-header {
+            margin-bottom: 35px;
+        }
+
+        .login-title {
+            font-size: 38px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+
+        .login-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Error alert box matching image style */
+        .error-message {
+            background: #e11d48;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2);
+            animation: shakeAlert 0.4s ease;
+        }
+
+        @keyframes shakeAlert {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: white;
+            font-size: 15px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #00e5ff;
+            background: rgba(6, 182, 212, 0.02);
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.15);
+        }
+
+        /* Password input positioning */
+        .password-wrapper {
+            position: relative;
+        }
+
+        .toggle-password-btn {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+            background: none;
+            border: none;
+            outline: none;
+        }
+
+        .toggle-password-btn:hover {
+            color: white;
+        }
+
+        /* Option row */
+        .options-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .remember-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .remember-checkbox input {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            accent-color: #00e5ff;
+        }
+
+        .forgot-password-link {
+            color: #00e5ff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .forgot-password-link:hover {
+            color: #0891b2;
+            text-decoration: underline;
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(90deg, #00e5ff 0%, #6366f1 100%);
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            outline: none;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+            background: linear-gradient(90deg, #0891b2 0%, #4f46e5 100%);
+        }
+
+        /* Divider */
+        .or-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #4b5563;
+            margin: 28px 0;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .or-divider::before, .or-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .or-divider:not(:empty)::before { margin-right: 1.2em; }
+        .or-divider:not(:empty)::after { margin-left: 1.2em; }
+
+        /* Google button */
+        .google-login-btn {
+            width: 100%;
+            padding: 13px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: white;
+            color: #111827;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .google-login-btn:hover {
+            background: #f9fafb;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Footer link */
+        .signup-footer {
+            text-align: center;
+            margin-top: 35px;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+
+        .signup-link {
+            color: #00e5ff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .signup-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="login-container">
+        <!-- Left Panel / Marketing Carousel -->
+        <div class="left-panel">
+            <div class="brand-section">
+                <h1 class="welcome-title">Welcome Back<br>LiteFlow!</h1>
+                <div class="title-line"></div>
+                <p class="welcome-subtitle">Nơi các tiệm nhỏ chạy thông minh hơn</p>
+            </div>
+
+            <!-- Outer Container to center card & dots vertically together -->
+            <div class="carousel-outer-container">
+                <div class="carousel-wrapper">
+                    <button class="carousel-btn" onclick="changeSlide('prev')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    
+                    <div class="carousel-card">
+                        <!-- Slide 1: Fast Checkout -->
+                        <div class="slide active">
+                            <div class="icon-container">
+                                <svg class="animated-icon cart-icon" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="cartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#00e5ff"/>
+                                            <stop offset="100%" stop-color="#6366f1"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="84" height="84" rx="20" fill="rgba(255, 255, 255, 0.03)" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1"/>
+                                    <g transform="translate(18, 18) scale(2)">
+                                        <circle cx="9" cy="21" r="1.5" class="wheel-1" fill="#6366f1"></circle>
+                                        <circle cx="20" cy="21" r="1.5" class="wheel-2" fill="#6366f1"></circle>
+                                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" stroke="url(#cartGrad)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" fill="rgba(147, 197, 253, 0.05)"></path>
+                                        <path d="M12 2a4 4 0 0 1 4 4" stroke="#00e5ff" stroke-width="1" stroke-linecap="round" class="wave wave-1"></path>
+                                        <path d="M12 5a2 2 0 0 1 2 2" stroke="#6366f1" stroke-width="1" stroke-linecap="round" class="wave wave-2"></path>
+                                    </g>
+                                </svg>
+                            </div>
+                            <h3 class="slide-title">Thanh Toán Nhanh</h3>
+                            <p class="slide-desc">Quy trình thanh toán an toàn và nhanh chóng</p>
+                        </div>
+
+                        <!-- Slide 2: Smart Inventory -->
+                        <div class="slide">
+                            <div class="icon-container">
+                                <svg class="animated-icon box-icon" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="boxTopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#fbbf24"/>
+                                            <stop offset="100%" stop-color="#f59e0b"/>
+                                        </linearGradient>
+                                        <linearGradient id="boxLeftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#f59e0b"/>
+                                            <stop offset="100%" stop-color="#d97706"/>
+                                        </linearGradient>
+                                        <linearGradient id="boxRightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#d97706"/>
+                                            <stop offset="100%" stop-color="#b45309"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="84" height="84" rx="20" fill="rgba(255, 255, 255, 0.03)" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1"/>
+                                    <g transform="translate(18, 16)">
+                                        <!-- isometric box sides -->
+                                        <path d="M24 2L4 12l20 10 20-10L24 2z" fill="url(#boxTopGrad)" fill-opacity="0.95" stroke="#d97706" stroke-width="1.5" class="box-lid"></path>
+                                        <path d="M4 12v22l20 10V24L4 12z" fill="url(#boxLeftGrad)" stroke="#b45309" stroke-width="1.5"></path>
+                                        <path d="M24 24v20l20-10V12L24 24z" fill="url(#boxRightGrad)" stroke="#78350f" stroke-width="1.5"></path>
+                                        <path d="M20 10l8 4" stroke="#78350f" stroke-width="2"></path>
+                                        <circle cx="12" cy="7.5" r="1.5" class="particle particle-1" fill="#f59e0b" stroke="none"></circle>
+                                        <polygon points="6,6 8,4 8,8" class="particle particle-2" fill="#00e5ff" stroke="none"></polygon>
+                                    </g>
+                                </svg>
+                            </div>
+                            <h3 class="slide-title">Smart Inventory</h3>
+                            <p class="slide-desc">Quản lý kho hàng thông minh với các gợi ý tự động</p>
+                        </div>
+
+                        <!-- Slide 3: Sales Analysis (Matching user image precisely) -->
+                        <div class="slide">
+                            <div class="icon-container">
+                                <svg class="animated-icon chart-icon" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="chartBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#ffffff"/>
+                                            <stop offset="100%" stop-color="#e2e8f0"/>
+                                        </linearGradient>
+                                        <linearGradient id="barGreenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stop-color="#4ade80"/>
+                                            <stop offset="100%" stop-color="#22c55e"/>
+                                        </linearGradient>
+                                        <linearGradient id="barRedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stop-color="#fb7185"/>
+                                            <stop offset="100%" stop-color="#f43f5e"/>
+                                        </linearGradient>
+                                        <linearGradient id="barBlueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stop-color="#60a5fa"/>
+                                            <stop offset="100%" stop-color="#3b82f6"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="84" height="84" rx="20" fill="url(#chartBgGrad)" stroke="#ffffff" stroke-width="1.5"/>
+                                    <line x1="21" y1="12" x2="21" y2="72" stroke="rgba(15, 23, 42, 0.08)" stroke-width="1.5"/>
+                                    <line x1="42" y1="12" x2="42" y2="72" stroke="rgba(15, 23, 42, 0.08)" stroke-width="1.5"/>
+                                    <line x1="63" y1="12" x2="63" y2="72" stroke="rgba(15, 23, 42, 0.08)" stroke-width="1.5"/>
+                                    <line x1="12" y1="27" x2="72" y2="27" stroke="rgba(15, 23, 42, 0.08)" stroke-width="1.5"/>
+                                    <line x1="12" y1="48" x2="72" y2="48" stroke="rgba(15, 23, 42, 0.08)" stroke-width="1.5"/>
+                                    <!-- columns -->
+                                    <rect x="22" y="32" width="10" height="32" rx="3.5" fill="url(#barGreenGrad)" class="bar bar-1"/>
+                                    <rect x="37" y="44" width="10" height="20" rx="3.5" fill="url(#barRedGrad)" class="bar bar-2"/>
+                                    <rect x="52" y="24" width="10" height="40" rx="3.5" fill="url(#barBlueGrad)" class="bar bar-3"/>
+                                </svg>
+                            </div>
+                            <h3 class="slide-title">Phân Tích Bán Hàng</h3>
+                            <p class="slide-desc">Hiểu rõ khách hàng và tăng trưởng kinh doanh nhanh hơn</p>
+                        </div>
+
+                        <!-- Slide 4: Multi-channel Sales -->
+                        <div class="slide">
+                            <div class="icon-container">
+                                <svg class="animated-icon globe-icon" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#00e5ff"/>
+                                            <stop offset="100%" stop-color="#6366f1"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="84" height="84" rx="20" fill="rgba(255, 255, 255, 0.03)" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1"/>
+                                    <g transform="translate(17, 17)">
+                                        <circle cx="25" cy="25" r="22" stroke="url(#globeGrad)" stroke-width="2" class="globe-rim" fill="rgba(0, 229, 255, 0.04)" stroke-dasharray="4 2"></circle>
+                                        <path d="M3 25h44" stroke="url(#globeGrad)" stroke-width="1.5" class="globe-line"></path>
+                                        <path d="M25 3a28 28 0 0 1 7 22 28 28 0 0 1-7 22" stroke="url(#globeGrad)" stroke-width="1.5" class="globe-axis"></path>
+                                        <path d="M25 3a28 28 0 0 0-7 22 28 28 0 0 0 7 22" stroke="url(#globeGrad)" stroke-width="1.5" class="globe-axis"></path>
+                                        <path d="M25 3v44" stroke="url(#globeGrad)" stroke-width="1.5"></path>
+                                        <circle cx="12" cy="12" r="3" fill="#6366f1" class="globe-dot globe-dot-1" stroke="none"></circle>
+                                        <circle cx="38" cy="38" r="3" fill="#f59e0b" class="globe-dot globe-dot-2" stroke="none"></circle>
+                                    </g>
+                                </svg>
+                            </div>
+                            <h3 class="slide-title">Bán Trên Nhiều Kênh</h3>
+                            <p class="slide-desc">Bán hàng trên shop, mạng xã hội từ một nền tảng</p>
+                        </div>
+                    </div>
+
+                    <button class="carousel-btn" onclick="changeSlide('next')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+
+                <!-- Pill-indicator dots aligned below the card -->
+                <div class="carousel-dots">
+                    <span class="dot active" onclick="goToSlide(0)"></span>
+                    <span class="dot" onclick="goToSlide(1)"></span>
+                    <span class="dot" onclick="goToSlide(2)"></span>
+                    <span class="dot" onclick="goToSlide(3)"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel / Login Form -->
+        <div class="right-panel">
+            <div class="login-header">
+                <h2 class="login-title">Đăng Nhập</h2>
+                <p class="login-subtitle">Chào mừng bạn quay lại!</p>
+            </div>
+
+            <!-- Red Error Alert box matching mockup style -->
+            <div th:if="${param.error}" class="error-message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>Yêu cầu không hợp lệ. Vui lòng làm mới và thử lại.</span>
+            </div>
+
+            <!-- Success logout box -->
+            <div th:if="${param.logout}" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px 16px; border-radius: 12px; margin-bottom: 24px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <span>Đã đăng xuất thành công.</span>
+            </div>
+
+            <form th:action="@{/login}" method="post">
+                <div class="form-group">
+                    <label for="email">Tài khoản</label>
+                    <input type="email" id="email" name="email" class="form-input" placeholder="admin@liteflow.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Mật khẩu</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
+                        <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility()">
+                            <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <label class="remember-checkbox">
+                        <input type="checkbox" name="remember-me">
+                        <span>Ghi nhớ tôi</span>
+                    </label>
+                    <a href="#" class="forgot-password-link" onclick="showToast('Hãy liên hệ Quản lý chi nhánh hoặc bộ phận IT để được hỗ trợ đặt lại mật khẩu.', 'error')">Quên mật khẩu?</a>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    Đăng Nhập
+                </button>
+            </form>
+
+            <div class="or-divider">Hoặc</div>
+
+            <!-- Simulated Google Login -->
+            <button class="google-login-btn" onclick="showToast('Đang chuyển hướng xác thực tài khoản Google Doanh Nghiệp...', 'warning')">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.2-5.136 4.2A5.64 5.64 0 0 1 8.32 12.96a5.64 5.64 0 0 1 5.671-5.64c2.482 0 4.5 1.637 5.137 3.86l3.968-3.078C20.89 4.3 17.58 2.5 13.99 2.5a10.45 10.45 0 0 0-10.48 10.46a10.45 10.45 0 0 0 10.48 10.46c5.85 0 10.37-4.11 10.37-10.45v-2.685H12.24Z"/></svg>
+                Đăng nhập bằng Google
+            </button>
+
+            <div class="signup-footer">
+                Chưa có tài khoản? <a href="#" class="signup-link" onclick="showToast('Hệ thống POS vận hành nội bộ. Vui lòng liên hệ bộ phận IT chi nhánh để được cấp tài khoản.', 'info')">Đăng Ký</a>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        // Password Visibility Toggle
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.innerHTML = `
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                `;
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                `;
+            }
+        }
+
+        // Carousel Slider Logic
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const dots = document.querySelectorAll('.dot');
+        let slideInterval = setInterval(nextSlide, 5000);
+
+        function showSlide(index) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+            currentSlide = (index + slides.length) % slides.length;
+            slides[currentSlide].classList.add('active');
+            dots[currentSlide].classList.add('active');
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function prevSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        function changeSlide(direction) {
+            clearInterval(slideInterval);
+            if (direction === 'next') {
+                nextSlide();
+            } else {
+                prevSlide();
+            }
+            slideInterval = setInterval(nextSlide, 5000);
+        }
+
+        function goToSlide(index) {
+            clearInterval(slideInterval);
+            showSlide(index);
+            slideInterval = setInterval(nextSlide, 5000);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            /*[# th:if="${param.error}"]*/
+            showToast("Đăng nhập thất bại. Vui lòng thử lại.", "error", 4000);
+            /*[/]*/
+            /*[# th:if="${param.logout}"]*/
+            showToast("Bạn đã đăng xuất thành công.", "success", 4000);
+            /*[/]*/
+        });
+    </script>
+</body>
+</html>

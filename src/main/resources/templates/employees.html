@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Employee Portal - LiteFlow</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .portal-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 24px;
+        }
+        .clock-panel {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .clock-btn {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            border: none;
+            transition: all 0.3s;
+        }
+        .clock-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 25px rgba(99, 102, 241, 0.4);
+        }
+        .clock-btn.out {
+            background: linear-gradient(135deg, var(--color-danger), #dc2626);
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+        .clock-btn.out:hover {
+            box-shadow: 0 15px 25px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Mobile Responsive HR Portal */
+        @media (max-width: 768px) {
+            .portal-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .clock-btn {
+                width: 130px;
+                height: 130px;
+                font-size: 18px;
+            }
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item active" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Portal Nhân Viên</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Chấm công, quản lý lịch ca và gửi đơn từ</p>
+                </div>
+                <div class="user-profile">
+                    <div class="avatar" th:text="${employee != null ? #strings.substring(employee.user.name, 0, 2).toUpperCase() : 'EM'}">EM</div>
+                    <span th:text="${employee != null ? employee.user.name : 'Nhân viên'}">Nhân viên</span>
+                </div>
+            </div>
+
+            <!-- Portal Grid -->
+            <div class="portal-grid">
+                <!-- Clock in/out column -->
+                <div class="glass-panel clock-panel" th:if="${noEmployeeProfile == null}">
+                    <h3 style="font-size: 18px; font-weight: 700;">Chấm Công Hàng Ngày</h3>
+                    <div style="font-size: 36px; font-weight: 700; margin: 10px 0;" id="clockDisplay">00:00:00</div>
+                    <div style="font-size: 14px; color: var(--text-muted);" th:text="${'Ngày: ' + #temporals.format(#temporals.createNow(), 'dd/MM/yyyy')}">29/05/2026</div>
+
+                    <button th:class="${canClockOut ? 'clock-btn out' : 'clock-btn'}" 
+                            th:disabled="${!canClockIn && !canClockOut}"
+                            id="clockBtn" 
+                            onclick="toggleClock()"
+                            th:text="${canClockOut ? 'Check Out' : 'Check In'}">
+                        Check In
+                    </button>
+
+                    <div style="font-size: 13px; color: var(--text-muted); margin-top: 10px;" id="clockStatus"
+                         th:text="${attendance == null ? 'Chưa chấm công hôm nay' : 
+                                   (attendance.clockOut == null ? 'Đã check-in vào lúc ' + #temporals.format(attendance.clockIn, 'HH:mm:ss') : 
+                                    'Đã hoàn thành ca làm lúc ' + #temporals.format(attendance.clockOut, 'HH:mm:ss') + (canClockIn ? '. Bạn còn ca tiếp theo chưa chấm công.' : ''))}">
+                        Chưa chấm công hôm nay
+                    </div>
+                </div>
+
+                <!-- Clock panel for accounts without employee profile (like chain admin) -->
+                <div class="glass-panel clock-panel" th:if="${noEmployeeProfile != null}" style="padding: 30px 20px;">
+                    <div style="font-size: 48px; margin-bottom: 12px;">👤</div>
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">Tài Khoản Quản Trị</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 15px;">
+                        Tài khoản của bạn không được liên kết với hồ sơ nhân viên để thực hiện chấm công.
+                    </p>
+                    <div style="font-size: 12px; color: var(--color-primary); background: rgba(99, 102, 241, 0.1); padding: 8px 12px; border-radius: 6px;">
+                        Vui lòng đăng nhập bằng tài khoản nhân viên (ví dụ: kitchen@liteflow.com) để chấm công.
+                    </div>
+                </div>
+
+                <!-- Requests and lists column -->
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Request buttons -->
+                    <div class="glass-panel" style="display: flex; gap: 16px;">
+                        <button class="btn btn-primary" onclick="showToast('Mở form xin nghỉ phép trực tuyến...', 'info')">
+                            📝 Gửi Đơn Xin Nghỉ Phép
+                        </button>
+                        <button class="btn btn-secondary" onclick="showToast('Mở form báo quên chấm công (Forgot Clock)...', 'info')">
+                            ⏰ Xin Bổ Sung Công
+                        </button>
+                    </div>
+
+                    <!-- Personal Schedule Calendar Widget -->
+                    <div class="glass-panel" style="padding: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h4 style="font-size: 16px; font-weight: 600; margin: 0;">Lịch Làm Việc Cá Nhân</h4>
+                            <select class="form-input" id="portal-schedule-month" onchange="loadPortalSchedule()" style="padding: 4px 8px; width: 150px; font-size: 13px;">
+                                <!-- Options dynamically generated -->
+                            </select>
+                        </div>
+                        <div class="table-responsive">
+                            <div style="min-width: 400px;">
+                                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; font-size: 12px; margin-bottom: 8px;">
+                                    <div style="font-weight: 600; color: var(--text-muted);">T2</div>
+                                    <div style="font-weight: 600; color: var(--text-muted);">T3</div>
+                                    <div style="font-weight: 600; color: var(--text-muted);">T4</div>
+                                    <div style="font-weight: 600; color: var(--text-muted);">T5</div>
+                                    <div style="font-weight: 600; color: var(--text-muted);">T6</div>
+                                    <div style="font-weight: 600; color: var(--text-muted);">T7</div>
+                                    <div style="font-weight: 600; color: var(--text-muted);">CN</div>
+                                </div>
+                                <div id="portal-schedule-days" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
+                                    <!-- Dynamic -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leaves list -->
+                    <div class="glass-panel">
+                        <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Danh Sách Đơn Nghỉ Phép</h4>
+                        <div class="table-responsive">
+                            <table class="premium-table" style="font-size: 14px;">
+                                <thead>
+                                    <tr>
+                                        <th>NGÀY BẮT ĐẦU</th>
+                                        <th>NGÀY KẾ THÚC</th>
+                                        <th>LOẠI NGHỈ</th>
+                                        <th>LÝ DO</th>
+                                        <th>TRẠNG THÁI</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="r : ${leaveRequests}">
+                                        <td th:text="${r.startDate}">01/06/2026</td>
+                                        <td th:text="${r.endDate}">02/06/2026</td>
+                                        <td th:text="${r.leaveType}">Phép năm có lương</td>
+                                        <td th:text="${r.reason}">Nghỉ phép thường niên</td>
+                                        <td>
+                                            <span class="status-badge badge-green" th:text="${r.status}">APPROVED</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(leaveRequests)}">
+                                        <td colspan="5" style="text-align: center; color: var(--text-muted);">Không có dữ liệu đơn phép.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update clock timer display
+        setInterval(function() {
+            let now = new Date();
+            document.getElementById('clockDisplay').innerText = now.toLocaleTimeString();
+        }, 1000);
+
+        let clockedIn = [[${canClockOut}]];
+
+        function toggleClock() {
+            if (!clockedIn) {
+                // Clock-in call
+                fetch('/api/employee/clock-in', { method: 'POST' })
+                    .then(res => {
+                        if (res.ok) {
+                            showToast("Check-in thành công!", "success");
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            res.text().then(text => showToast("Lỗi: " + text, "error"));
+                        }
+                    });
+            } else {
+                // Clock-out call
+                fetch('/api/employee/clock-out', { method: 'POST' })
+                    .then(res => {
+                        if (res.ok) {
+                            showToast("Check-out thành công!", "success");
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            res.text().then(text => showToast("Lỗi: " + text, "error"));
+                        }
+                    });
+            }
+        }
+
+        function getDaysInMonth(year, month) {
+            return new Date(year, month, 0).getDate();
+        }
+
+        function getFirstDayOfWeek(year, month) {
+            let day = new Date(year, month - 1, 1).getDay();
+            return day === 0 ? 6 : day - 1; // Mon=0, Sun=6
+        }
+
+        function populatePortalMonthSelector() {
+            let now = new Date();
+            let currentYear = now.getFullYear();
+            let currentMonth = now.getMonth();
+            let sel = document.getElementById('portal-schedule-month');
+            if (!sel) return;
+            sel.innerHTML = '';
+            
+            for (let i = -1; i <= 2; i++) {
+                let d = new Date(currentYear, currentMonth + i, 1);
+                let year = d.getFullYear();
+                let month = d.getMonth() + 1;
+                let monthStr = month < 10 ? '0' + month : month;
+                let val = `${year}-${monthStr}`;
+                
+                let opt = document.createElement('option');
+                opt.value = val;
+                opt.innerText = `Tháng ${monthStr}/${year}`;
+                if (i === 0) opt.selected = true;
+                sel.appendChild(opt);
+            }
+        }
+
+        function loadPortalSchedule() {
+            let selectVal = document.getElementById('portal-schedule-month').value;
+            if (!selectVal) return;
+            
+            const parts = selectVal.split('-');
+            const year = parseInt(parts[0]);
+            const month = parseInt(parts[1]);
+            const monthStr = parts[1];
+            
+            const firstDay = getFirstDayOfWeek(year, month);
+            const daysInMonth = getDaysInMonth(year, month);
+            const grid = document.getElementById('portal-schedule-days');
+            if (!grid) return;
+            
+            grid.innerHTML = '<div style="grid-column: span 7; text-align: center; padding: 10px; font-size: 13px;">Đang tải lịch...</div>';
+            
+            fetch(`/api/hr/schedule/my-schedule?month=${selectVal}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("Chưa có hồ sơ nhân viên");
+                    return res.json();
+                })
+                .then(data => {
+                    grid.innerHTML = '';
+                    
+                    // Spacers
+                    for (let i = 0; i < firstDay; i++) {
+                        const spacer = document.createElement('div');
+                        spacer.style.background = 'transparent';
+                        grid.appendChild(spacer);
+                    }
+                    
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dayStr = day < 10 ? '0' + day : day;
+                        const dateString = `${year}-${monthStr}-${dayStr}`;
+                        const dayAssignments = data.filter(a => a.date === dateString);
+                        
+                        const dayDiv = document.createElement('div');
+                        dayDiv.style.background = 'var(--bg-card)';
+                        dayDiv.style.border = '1px solid var(--border-color)';
+                        dayDiv.style.borderRadius = '6px';
+                        dayDiv.style.padding = '6px 4px';
+                        dayDiv.style.minHeight = '65px';
+                        dayDiv.style.display = 'flex';
+                        dayDiv.style.flexDirection = 'column';
+                        dayDiv.style.justifyContent = 'space-between';
+                        
+                        let todayStr = new Date().toISOString().split('T')[0];
+                        if (dateString === todayStr) {
+                            dayDiv.style.borderColor = 'var(--color-primary)';
+                            dayDiv.style.boxShadow = '0 0 6px rgba(99, 102, 241, 0.2)';
+                        }
+                        
+                        let headerHtml = `<div style="font-weight: 700; font-size: 12px; text-align: left;">${day}</div>`;
+                        let shiftsHtml = '';
+                        
+                        dayAssignments.forEach(assignment => {
+                            let badgeClass = 'shift-morning';
+                            if (assignment.shiftTemplateId === 2) badgeClass = 'shift-afternoon';
+                            else if (assignment.shiftTemplateId === 3) badgeClass = 'shift-night';
+                            
+                            shiftsHtml += `
+                                <div class="shift-badge ${badgeClass}" style="margin: 2px 0 0 0; padding: 2px; font-size: 9px; text-align: center; border-radius: 4px;" title="${assignment.startTime} - ${assignment.endTime}">
+                                    <b>${assignment.shiftTemplateName}</b>
+                                </div>
+                            `;
+                        });
+                        
+                        dayDiv.innerHTML = headerHtml + (shiftsHtml ? shiftsHtml : '<div style="color: var(--text-muted); font-size: 9px; text-align: center; margin-top: 4px;">Nghỉ</div>');
+                        grid.appendChild(dayDiv);
+                    }
+                })
+                .catch(err => {
+                    grid.innerHTML = '<div style="grid-column: span 7; text-align: center; color: var(--text-muted); padding: 10px; font-size: 12px;">Không có ca làm cá nhân.</div>';
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            populatePortalMonthSelector();
+            loadPortalSchedule();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>LiteFlow Admin - Báo Cáo & Phân Tích</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .chart-container {
+            height: 250px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding-top: 20px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        .chart-bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+            height: 100%;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .chart-bar {
+            width: 32px;
+            background: linear-gradient(180deg, var(--color-success), var(--color-primary));
+            border-radius: 6px 6px 0 0;
+            transition: height 0.5s ease;
+        }
+        .chart-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .sidebar-right {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .main-layout {
+            display: flex;
+            gap: 24px;
+            flex-grow: 1;
+        }
+        .dashboard-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .seller-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            border-left: 3px solid var(--color-primary);
+        }
+        /* AI Chat styling */
+        .chat-box {
+            display: flex;
+            flex-direction: column;
+            height: 380px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 14px;
+        }
+        .message {
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 85%;
+            line-height: 1.4;
+        }
+        .msg-ai {
+            background: rgba(99, 102, 241, 0.15);
+            border-left: 3px solid var(--color-primary);
+            align-self: flex-start;
+        }
+        .msg-user {
+            background: var(--color-primary);
+            color: white;
+            align-self: flex-end;
+        }
+        .chat-input-area {
+            display: flex;
+            padding: 8px;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2);
+        }
+        .chat-text {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            padding: 8px;
+            font-size: 14px;
+        }
+        .chat-send {
+            background: var(--color-primary);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        /* Responsive adjustments for Dashboard */
+        @media (max-width: 992px) {
+            .main-layout {
+                flex-direction: column;
+            }
+            .sidebar-right {
+                width: 100%;
+            }
+            .chat-box {
+                height: 320px;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .chart-container {
+                height: 200px;
+                padding-top: 10px;
+                gap: 8px;
+            }
+            .chart-bar {
+                width: 20px;
+            }
+            .chart-label {
+                font-size: 10px;
+            }
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item" th:if="${isSuperAdmin}"><a href="#" onclick="openBranchAdminManager()">👥 Đối Tác Chi Nhánh</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Phân Tích & Báo Cáo</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Xem chi tiết doanh số chuỗi cửa hàng</p>
+                </div>
+                <div class="user-profile">
+                    <select class="form-input" style="padding: 6px 12px; margin-right: 12px;">
+                        <option>Chi nhánh: Trung Tâm</option>
+                        <option>Chi nhánh: Quận 1</option>
+                    </select>
+                    <div class="avatar">AD</div>
+                    <span>Quản trị viên</span>
+                </div>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <div class="glass-panel metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px;">Tổng Doanh Thu</p>
+                        <h3 class="metric-value" th:text="${'₫' + #numbers.formatDecimal(totalRevenue, 0, 'COMMA', 0, 'POINT')}">₫125,500,000</h3>
+                    </div>
+                    <span class="metric-change change-positive">+12%</span>
+                </div>
+                <div class="glass-panel metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px;">Bàn Đang Hoạt Động</p>
+                        <h3 class="metric-value" th:text="${activeTables}">24</h3>
+                    </div>
+                    <span class="metric-change change-positive">+8%</span>
+                </div>
+                <div class="glass-panel metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px;">Hóa Đơn Chờ Xử Lý</p>
+                        <h3 class="metric-value" th:text="${pendingOrders}">8</h3>
+                    </div>
+                    <span class="metric-change change-negative">-3%</span>
+                </div>
+            </div>
+
+            <!-- Main Layout: Charts & AI assistant -->
+            <div class="main-layout">
+                <!-- Left panel: Revenue charts -->
+                <div class="dashboard-body">
+                    <div class="glass-panel">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                            <h4 style="font-size: 18px; font-weight: 600;">Doanh Thu Theo Chi Nhánh</h4>
+                            <button class="btn btn-secondary" onclick="showToast('Đang xuất báo cáo tài chính ra Excel (.xlsx)...', 'info')" style="padding: 4px 12px; font-size: 13px;">
+                                📥 Xuất Excel
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <div class="chart-bar-wrapper">
+                                <div class="chart-bar" style="height: 80%;"></div>
+                                <div class="chart-label">Trung Tâm<br><b>75.8M</b></div>
+                            </div>
+                            <div class="chart-bar-wrapper">
+                                <div class="chart-bar" style="height: 60%; background: var(--color-primary);"></div>
+                                <div class="chart-label">Quận 1<br><b>32.5M</b></div>
+                            </div>
+                            <div class="chart-bar-wrapper">
+                                <div class="chart-bar" style="height: 40%;"></div>
+                                <div class="chart-label">Tân Bình<br><b>12.2M</b></div>
+                            </div>
+                            <div class="chart-bar-wrapper">
+                                <div class="chart-bar" style="height: 15%;"></div>
+                                <div class="chart-label">Bình Thạnh<br><b>3.4M</b></div>
+                            </div>
+                            <div class="chart-bar-wrapper">
+                                <div class="chart-bar" style="height: 8%;"></div>
+                                <div class="chart-label">Phú Nhuận<br><b>1.6M</b></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right panel: Best sellers and AI Chat -->
+                <div class="sidebar-right">
+                    <!-- Best Sellers -->
+                    <div class="glass-panel" style="display: flex; flex-direction: column; gap: 12px;">
+                        <h4 style="font-size: 18px; font-weight: 600;">Món Ăn Bán Chạy</h4>
+                        <div th:each="seller : ${bestSellers}" class="seller-item">
+                            <span th:text="${seller.name}">Gỏi Cuốn Tôm</span>
+                            <span style="font-weight: 700; color: var(--color-success);" th:text="${seller.value}">1.6M</span>
+                        </div>
+                    </div>
+
+                    <!-- AI Assistant -->
+                    <div class="chat-box glass-panel" style="padding: 0;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                            <span>✨ Trợ lý ảo AI - LiteFlow</span>
+                        </div>
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message msg-ai">
+                                Xin chào! Tôi là trợ lý AI của hệ thống LiteFlow. Tôi có thể giúp gì cho việc vận hành nhà hàng hôm nay?
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="chatInput" class="chat-text" placeholder="Hỏi AI (doanh số, nguyên liệu...)" onkeydown="if(event.key==='Enter') sendChatMessage()">
+                            <button class="chat-send" onclick="sendChatMessage()">Gửi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Append user message
+            const container = document.getElementById('chatMessages');
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message msg-user';
+            userDiv.innerText = message;
+            container.appendChild(userDiv);
+            container.scrollTop = container.scrollHeight;
+
+            input.value = '';
+
+            // Loading state
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message msg-ai';
+            loadingDiv.innerText = 'Đang suy nghĩ...';
+            container.appendChild(loadingDiv);
+            container.scrollTop = container.scrollHeight;
+
+            // Fetch backend API
+            fetch('/api/analytics/ai-chat?query=' + encodeURIComponent(message), {
+                method: 'POST'
+            })
+            .then(res => res.json())
+            .then(data => {
+                loadingDiv.innerText = data.reply;
+                container.scrollTop = container.scrollHeight;
+            })
+            .catch(err => {
+                loadingDiv.innerText = 'Lỗi kết nối. Thử lại sau.';
+            });
+        }
+    </script>
+
+    <!-- Branch Admin Manager Modal (Super Admin only) -->
+    <div class="modal-overlay" id="branchAdminManagerModal" th:if="${isSuperAdmin}">
+        <div class="modal-box" style="width: 800px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 20px; font-weight: 700;">👥 Quản Lý Đối Tác / Admin Chi Nhánh</h3>
+                <button class="modal-close" onclick="closeBranchAdminManagerModal()">×</button>
+            </div>
+            
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
+                <!-- Add/Edit Admin Form -->
+                <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                    <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;" id="adminFormTitle">➕ Thêm Đối Tác / Admin Chi Nhánh</h4>
+                    <input type="hidden" id="editAdminId">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Họ tên đối tác</label>
+                            <input type="text" id="adminName" class="form-input" placeholder="Ví dụ: Nguyễn Văn A..." style="padding: 8px 12px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Email (Tên đăng nhập)</label>
+                            <input type="email" id="adminEmail" class="form-input" placeholder="Ví dụ: partner1@liteflow.com..." style="padding: 8px 12px;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Mật khẩu</label>
+                            <input type="password" id="adminPassword" class="form-input" placeholder="Bỏ trống nếu không đổi..." style="padding: 8px 12px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Chi nhánh quản lý</label>
+                            <select id="adminBranchId" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px;">
+                                <option value="">Hệ thống (Không chi nhánh)</option>
+                                <option th:each="b : ${branches}" th:value="${b.branchId}" th:text="${b.name}">Trung Tâm</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Vai trò</label>
+                            <select id="adminRoleName" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px;">
+                                <option value="ADMIN">ADMIN (Quản trị chi nhánh)</option>
+                                <option value="MANAGER">MANAGER (Quản lý chi nhánh)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="form-group" style="margin-bottom: 0; flex-direction: row; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="adminIsActive" checked style="width: 16px; height: 16px;">
+                            <label for="adminIsActive" style="font-size: 13px; font-weight: 500; cursor: pointer;">Kích hoạt tài khoản</label>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-primary" onclick="submitAdminForm()" style="padding: 8px 16px; height: 38px;">Lưu đối tác</button>
+                            <button class="btn btn-secondary" id="cancelAdminEditBtn" onclick="resetAdminForm()" style="padding: 8px 12px; height: 38px; display: none;">Hủy</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Admins List Table -->
+                <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">📋 Danh sách đối tác / Admin chi nhánh</h4>
+                <div class="table-responsive">
+                    <table class="premium-table" style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 8px;">Họ tên</th>
+                                <th style="padding: 8px;">Email</th>
+                                <th style="padding: 8px;">Chi nhánh</th>
+                                <th style="padding: 8px;">Vai trò</th>
+                                <th style="padding: 8px;">Trạng thái</th>
+                                <th style="padding: 8px; text-align: right;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="branchAdminsList">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript" th:if="${isSuperAdmin}">
+        function openBranchAdminManager() {
+            document.getElementById('branchAdminManagerModal').classList.add('active');
+            loadBranchAdmins();
+        }
+
+        function closeBranchAdminManagerModal() {
+            document.getElementById('branchAdminManagerModal').classList.remove('active');
+        }
+
+        function loadBranchAdmins() {
+            fetch('/api/pos/branch-admins')
+                .then(res => res.json())
+                .then(users => {
+                    let listHtml = "";
+                    if (users.length === 0) {
+                        listHtml = `<tr><td colspan="6" style="text-align:center; padding: 12px; color: var(--text-muted);">Chưa có tài khoản đối tác nào.</td></tr>`;
+                    } else {
+                        users.forEach(u => {
+                            let statusText = u.isActive ? 'Hoạt động' : 'Đang khóa';
+                            let statusClass = u.isActive ? 'badge-green' : 'badge-red';
+                            listHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px; font-weight:600;">${u.name}</td>
+                                    <td style="padding: 10px;">${u.email}</td>
+                                    <td style="padding: 10px;">${u.branchName}</td>
+                                    <td style="padding: 10px;">${u.roleName}</td>
+                                    <td style="padding: 10px;"><span class="status-badge ${statusClass}" style="padding: 2px 8px; font-size:11px;">${statusText}</span></td>
+                                    <td style="padding: 10px; text-align: right; display: flex; gap: 6px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" onclick="editBranchAdmin(${u.id}, '${u.name}', '${u.email}', '${u.branchId}', '${u.roleName}', ${u.isActive})" style="padding: 4px 8px; font-size:11px; border-radius:6px;">✏️ Sửa</button>
+                                        <button class="btn btn-danger" onclick="deleteBranchAdmin(${u.id})" style="padding: 4px 8px; font-size:11px; border-radius:6px;">🗑️ Xóa / Khóa</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    document.getElementById('branchAdminsList').innerHTML = listHtml;
+                });
+        }
+
+        function editBranchAdmin(id, name, email, branchId, roleName, isActive) {
+            document.getElementById('editAdminId').value = id;
+            document.getElementById('adminName').value = name;
+            document.getElementById('adminEmail').value = email;
+            document.getElementById('adminPassword').placeholder = "Nhập mật khẩu mới nếu muốn đổi...";
+            document.getElementById('adminBranchId').value = branchId;
+            document.getElementById('adminRoleName').value = roleName;
+            document.getElementById('adminIsActive').checked = isActive;
+            document.getElementById('adminFormTitle').innerText = "✏️ Cập nhật Đối Tác #" + id;
+            document.getElementById('cancelAdminEditBtn').style.display = 'inline-flex';
+        }
+
+        function resetAdminForm() {
+            document.getElementById('editAdminId').value = "";
+            document.getElementById('adminName').value = "";
+            document.getElementById('adminEmail').value = "";
+            document.getElementById('adminPassword').value = "";
+            document.getElementById('adminPassword').placeholder = "Mật khẩu cho tài khoản mới...";
+            document.getElementById('adminBranchId').value = "";
+            document.getElementById('adminRoleName').value = "ADMIN";
+            document.getElementById('adminIsActive').checked = true;
+            document.getElementById('adminFormTitle').innerText = "➕ Thêm Đối Tác / Admin Chi Nhánh";
+            document.getElementById('cancelAdminEditBtn').style.display = 'none';
+        }
+
+        function submitAdminForm() {
+            let id = document.getElementById('editAdminId').value;
+            let name = document.getElementById('adminName').value.trim();
+            let email = document.getElementById('adminEmail').value.trim();
+            let password = document.getElementById('adminPassword').value;
+            let branchId = document.getElementById('adminBranchId').value;
+            let roleName = document.getElementById('adminRoleName').value;
+            let isActive = document.getElementById('adminIsActive').checked;
+
+            if (!name || !email) {
+                showToast("Vui lòng nhập đầy đủ họ tên và email.", "error");
+                return;
+            }
+            if (!id && !password) {
+                showToast("Tài khoản mới bắt buộc nhập mật khẩu.", "error");
+                return;
+            }
+
+            let url = id 
+                ? `/api/pos/branch-admins/update?id=${id}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&password=${encodeURIComponent(password)}&branchId=${branchId}&roleName=${roleName}&isActive=${isActive}`
+                : `/api/pos/branch-admins/add?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&password=${encodeURIComponent(password)}&branchId=${branchId}&roleName=${roleName}`;
+
+            fetch(url, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
+                    resetAdminForm();
+                    loadBranchAdmins();
+                    showToast(id ? "Đã cập nhật tài khoản quản trị thành công." : "Đã tạo tài khoản quản trị thành công.", "success");
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+
+        function deleteBranchAdmin(adminId) {
+            if (!confirm("Bạn có chắc chắn muốn xóa/khóa tài khoản đối tác này?")) {
+                return;
+            }
+            fetch(`/api/pos/branch-admins/delete?id=${adminId}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    showToast(data.message, "success");
+                    loadBranchAdmins();
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+    </script>
+</body>
+</html>

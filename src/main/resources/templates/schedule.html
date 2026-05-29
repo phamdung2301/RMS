@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Lịch Làm Việc - Nhân Sự</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .schedule-grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-surface);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        .schedule-grid-table th {
+            padding: 16px;
+            border-bottom: 2px solid var(--border-color);
+            background: rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .schedule-grid-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            vertical-align: top;
+            height: 110px;
+            width: 12%;
+        }
+        .employee-col {
+            width: 15% !important;
+            font-weight: 600;
+            background: rgba(255,255,255,0.01);
+        }
+        .shift-badge {
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .shift-badge:hover {
+            transform: scale(1.03);
+        }
+        .shift-morning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: #f59e0b; }
+        .shift-afternoon { background: rgba(99, 102, 241, 0.15); color: #818cf8; border-color: #818cf8; }
+        .shift-night { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: #34d399; }
+        .no-shift {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-align: center;
+            padding-top: 30px;
+        }
+        .active-tab {
+            background: var(--color-primary) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        /* Mobile responsive adjustments for schedule planner */
+        @media (max-width: 768px) {
+            .schedule-grid-table {
+                min-width: 800px;
+            }
+            .calendar-month-grid, #month-grid-days {
+                min-width: 600px;
+            }
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Lịch Làm Việc</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Quản lý phân ca và điều phối giờ công nhân sự</p>
+                </div>
+                <div style="display: flex; gap: 8px;" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')">
+                    <button class="btn btn-secondary" onclick="openShiftTemplateModal()">
+                        ⚙️ Cấu Hình Ca Làm
+                    </button>
+                    <button class="btn btn-primary" onclick="openAssignModal()">
+                        ➕ Thêm Ca Làm Việc
+                    </button>
+                </div>
+            </div>
+
+            <!-- Schedule View Switcher Tab Buttons -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <button class="btn btn-secondary active-tab" id="tab-week" onclick="switchScheduleView('week')">📅 Xem Theo Tuần</button>
+                <button class="btn btn-secondary" id="tab-day" onclick="switchScheduleView('day')">☀️ Xem Theo Ngày</button>
+                <button class="btn btn-secondary" id="tab-month" onclick="switchScheduleView('month')">🗓️ Xem Theo Tháng</button>
+                <button class="btn btn-secondary" id="tab-my" onclick="switchScheduleView('my')">👤 Lịch Của Tôi</button>
+            </div>
+
+            <!-- Calendar Schedule table -->
+            <div id="week-view-container" class="glass-panel" style="padding: 0;">
+                <div class="table-responsive">
+                    <table class="schedule-grid-table">
+                    <thead>
+                        <tr>
+                            <th>NHÂN VIÊN</th>
+                            <th th:each="date, iterStat : ${weekDates}">
+                                <span th:text="${iterStat.index == 6 ? 'Chủ Nhật' : 'Thứ ' + (iterStat.index + 2)}">Thứ 2</span><br>
+                                <span style="font-size:12px; font-weight:normal;" th:text="${date.dayOfMonth + '/' + date.monthValue}">2/6</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="emp : ${employees}">
+                            <td class="employee-col">
+                                <span th:text="${emp.user.name}">Nguyễn Văn A</span><br>
+                                <span style="font-size:12px; color:var(--text-muted);" th:text="${emp.title}">Quản Lý</span>
+                            </td>
+                            
+                            <!-- Dynamic Monday to Sunday iteration -->
+                            <td th:each="date : ${weekDates}">
+                                <div th:each="assignment : ${assignments}" 
+                                     th:if="${assignment.employee.id == emp.id && assignment.date.equals(date)}"
+                                     th:class="${'shift-badge ' + (assignment.shiftTemplate.id == 1 ? 'shift-morning' : (assignment.shiftTemplate.id == 2 ? 'shift-afternoon' : (assignment.shiftTemplate.id == 3 ? 'shift-night' : 'shift-morning')))}"
+                                     th:title="${assignment.shiftTemplate.name}">
+                                     <b th:text="${assignment.shiftTemplate.name}">Ca Sáng</b><br>
+                                     ⏱️ <span th:text="${assignment.shiftTemplate.startTime + ' - ' + assignment.shiftTemplate.endTime}">08:00 - 16:00</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Day View Container (hidden by default) -->
+            <div id="day-view-container" class="glass-panel" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4 id="day-view-title" style="font-size: 18px; font-weight: 600;">Lịch Làm Việc Ngày</h4>
+                    <input type="date" class="form-input" id="day-view-picker" value="2026-05-29" onchange="changeDayView(this.value)" style="padding: 6px 12px; width: 180px;">
+                </div>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                    <thead>
+                        <tr>
+                            <th>NHÂN VIÊN</th>
+                            <th>CA LÀM VIỆC</th>
+                            <th>THỜI GIAN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="day-view-tbody">
+                        <!-- Dynamic -->
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Month View Container (hidden by default) -->
+            <div id="month-view-container" class="glass-panel" style="display: none; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4 id="month-view-title" style="font-size: 18px; font-weight: 600;">Lịch Làm Việc Hệ Thống</h4>
+                    <select class="form-input" id="month-view-select" onchange="renderMonthView()" style="padding: 6px 12px; width: 180px;">
+                        <!-- Options generated in JS -->
+                    </select>
+                </div>
+                <div class="table-responsive">
+                    <div style="min-width: 600px;">
+                        <div class="calendar-month-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; text-align: center;">
+                            <!-- Calendar Header -->
+                            <div style="font-weight: 600; color: var(--text-muted);">T2</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T3</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T4</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T5</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T6</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T7</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">CN</div>
+                        </div>
+                        <div id="month-grid-days" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 10px;">
+                            <!-- Dynamic -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Schedule Container (hidden by default) -->
+            <div id="my-view-container" class="glass-panel" style="display: none; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4 style="font-size: 18px; font-weight: 600;">Lịch Làm Việc Cá Nhân</h4>
+                    <select class="form-input" id="my-view-month" onchange="renderMyView()" style="padding: 6px 12px; width: 180px;">
+                        <!-- Options generated in JS -->
+                    </select>
+                </div>
+                <div class="table-responsive">
+                    <div style="min-width: 600px;">
+                        <div class="calendar-month-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; text-align: center;">
+                            <!-- Calendar Header -->
+                            <div style="font-weight: 600; color: var(--text-muted);">T2</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T3</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T4</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T5</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T6</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">T7</div>
+                            <div style="font-weight: 600; color: var(--text-muted);">CN</div>
+                        </div>
+                        <div id="my-grid-days" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 10px;">
+                            <!-- Dynamic -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduling Assign Modal -->
+    <div class="modal-overlay" id="assignModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Phân Ca Nhân Viên</h3>
+                <button class="modal-close" onclick="closeAssignModal()">×</button>
+            </div>
+            <form onsubmit="saveShiftAssignment(event)">
+                <div class="form-group">
+                    <label>Chọn Nhân Viên</label>
+                    <input type="text" class="form-input" id="modalEmpSearch" placeholder="Tìm nhanh nhân viên..." oninput="filterEmployeeList()" style="margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllEmployees(this)"> Chọn tất cả
+                        </label>
+                        <span id="checkedCount" style="color: var(--text-muted);">Đã chọn: 0</span>
+                    </div>
+                    <div class="employee-checkbox-list" id="employeeCheckboxContainer" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; background: rgba(0,0,0,0.15);">
+                        <div th:each="emp : ${employees}" class="employee-checkbox-item" th:data-name="${#strings.toLowerCase(emp.user.name)}" style="display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <input type="checkbox" name="selectedEmployees" th:value="${emp.id}" onchange="updateCheckedCount()" style="cursor: pointer;">
+                            <label style="cursor: pointer; font-size: 14px;">
+                                <span th:text="${emp.user.name}">Nguyễn Văn A</span>
+                                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;" th:text="${'(' + emp.title + ')'}">(Phục vụ)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Ca Làm Việc</label>
+                    <select class="form-input" id="modalShiftId">
+                        <option th:each="template : ${shiftTemplates}" th:value="${template.id}" th:text="${template.name + ' (' + template.startTime + ' - ' + template.endTime + ')'}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ngày làm việc</label>
+                    <input type="date" class="form-input" id="modalShiftDate" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+                    Lưu lịch ca
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shift Template Config Modal -->
+    <div class="modal-overlay" id="shiftTemplateModal">
+        <div class="modal-box" style="max-width: 600px; width: 90%;">
+            <div class="modal-header">
+                <h3>Cấu Hình Ca Làm Việc</h3>
+                <button class="modal-close" onclick="closeShiftTemplateModal()">×</button>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 10px; font-size: 15px; color: var(--color-primary);">Ca Làm Việc Hiện Có</h4>
+                <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                    <table class="premium-table" style="font-size: 13px; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Tên Ca</th>
+                                <th>Giờ Làm</th>
+                                <th>Giờ Công (h)</th>
+                                <th>Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shift-template-tbody">
+                            <!-- Dynamic rendering from JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <form id="shiftTemplateForm" onsubmit="saveShiftTemplate(event)">
+                <input type="hidden" id="templateId">
+                <h4 id="form-template-title" style="margin-bottom: 10px; font-size: 15px; color: var(--color-primary);">Thêm Ca Làm Mới</h4>
+                
+                <div class="form-group">
+                    <label>Tên Ca Làm Việc</label>
+                    <input type="text" class="form-input" id="templateName" required placeholder="Ví dụ: Ca Sáng, Ca Chiều, Ca Gãy...">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label>Giờ Bắt Đầu</label>
+                        <input type="time" class="form-input" id="templateStartTime" required onchange="calculateDuration()">
+                    </div>
+                    <div class="form-group">
+                        <label>Giờ Kết Thúc</label>
+                        <input type="time" class="form-input" id="templateEndTime" required onchange="calculateDuration()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Số Giờ Công (Tự động tính)</label>
+                    <input type="number" step="0.1" class="form-input" id="templateDuration" readonly style="background: rgba(255,255,255,0.05);">
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary" onclick="resetShiftTemplateForm()" style="flex: 1; justify-content: center;">
+                        Hủy
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="flex: 2; justify-content: center;">
+                        Lưu Cấu Hình
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openAssignModal() {
+            document.getElementById('modalShiftDate').valueAsDate = new Date();
+            // Reset modal employee checkboxes
+            let checkboxes = document.getElementsByName('selectedEmployees');
+            checkboxes.forEach(cb => cb.checked = false);
+            document.getElementById('selectAllCheckbox').checked = false;
+            document.getElementById('modalEmpSearch').value = '';
+            filterEmployeeList();
+            updateCheckedCount();
+            
+            document.getElementById('assignModal').classList.add('active');
+        }
+        
+        function closeAssignModal() {
+            document.getElementById('assignModal').classList.remove('active');
+        }
+        
+        function filterEmployeeList() {
+            let query = document.getElementById('modalEmpSearch').value.toLowerCase().trim();
+            let items = document.querySelectorAll('.employee-checkbox-item');
+            items.forEach(item => {
+                let name = item.getAttribute('data-name');
+                if (name.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        function toggleSelectAllEmployees(checkbox) {
+            let checked = checkbox.checked;
+            let checkboxes = document.getElementsByName('selectedEmployees');
+            checkboxes.forEach(cb => {
+                if (cb.parentElement.parentElement.style.display !== 'none') {
+                    cb.checked = checked;
+                }
+            });
+            updateCheckedCount();
+        }
+        
+        function updateCheckedCount() {
+            let checkboxes = document.getElementsByName('selectedEmployees');
+            let count = 0;
+            checkboxes.forEach(cb => {
+                if (cb.checked) count++;
+            });
+            document.getElementById('checkedCount').innerText = `Đã chọn: ${count}`;
+        }
+
+        function saveShiftAssignment(e) {
+            e.preventDefault();
+            let checkedBoxes = document.querySelectorAll('input[name="selectedEmployees"]:checked');
+            if (checkedBoxes.length === 0) {
+                showToast("Vui lòng chọn ít nhất một nhân viên.", "warning");
+                return;
+            }
+            let empIds = [];
+            checkedBoxes.forEach(cb => empIds.push(parseInt(cb.value)));
+            
+            let shiftId = parseInt(document.getElementById('modalShiftId').value);
+            let date = document.getElementById('modalShiftDate').value;
+            
+            fetch('/api/hr/schedule/assign-bulk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    employeeIds: empIds,
+                    shiftTemplateId: shiftId,
+                    date: date
+                })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã xếp lịch ca thành công.", "success");
+                    closeAssignModal();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    let errMsg = await response.text();
+                    showToast("Cảnh báo: " + errMsg, "warning");
+                }
+            })
+            .catch(error => {
+                showToast("Lỗi hệ thống: " + error, "error");
+            });
+        }
+
+        function switchScheduleView(viewType) {
+            document.getElementById('tab-week').classList.remove('active-tab');
+            document.getElementById('tab-day').classList.remove('active-tab');
+            document.getElementById('tab-month').classList.remove('active-tab');
+            document.getElementById('tab-my').classList.remove('active-tab');
+            
+            document.getElementById('tab-' + viewType).classList.add('active-tab');
+            
+            document.getElementById('week-view-container').style.display = 'none';
+            document.getElementById('day-view-container').style.display = 'none';
+            document.getElementById('month-view-container').style.display = 'none';
+            document.getElementById('my-view-container').style.display = 'none';
+            
+            if (viewType === 'week') {
+                document.getElementById('week-view-container').style.display = 'block';
+            } else if (viewType === 'day') {
+                document.getElementById('day-view-container').style.display = 'block';
+                renderDayView();
+            } else if (viewType === 'month') {
+                document.getElementById('month-view-container').style.display = 'block';
+                renderMonthView();
+            } else if (viewType === 'my') {
+                document.getElementById('my-view-container').style.display = 'block';
+                renderMyView();
+            }
+        }
+
+        function renderDayView() {
+            const pickerVal = document.getElementById('day-view-picker').value;
+            if (!pickerVal) return;
+            const dateObj = new Date(pickerVal);
+            
+            const dayNames = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+            const formattedDateStr = pickerVal.split('-').reverse().join('/');
+            document.getElementById('day-view-title').innerText = `Lịch Làm Việc Ngày ${dayNames[dateObj.getDay()]} (${formattedDateStr})`;
+            
+            const tbody = document.getElementById('day-view-tbody');
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Đang tải dữ liệu...</td></tr>';
+            
+            fetch(`/api/hr/schedule/range?start=${pickerVal}&end=${pickerVal}`)
+                .then(res => res.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Không có ca làm việc nào trong ngày này.</td></tr>';
+                        return;
+                    }
+                    
+                    data.forEach(assignment => {
+                        let shiftClass = 'shift-morning';
+                        if (assignment.shiftTemplateId === 2) shiftClass = 'shift-afternoon';
+                        else if (assignment.shiftTemplateId === 3) shiftClass = 'shift-night';
+                        
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td class="employee-col">
+                                <span>${assignment.employeeName}</span><br>
+                                <span style="font-size:12px; color:var(--text-muted);">${assignment.employeeTitle}</span>
+                            </td>
+                            <td>
+                                <div class="shift-badge ${shiftClass}" style="margin: 0; display: inline-block;">
+                                    <b>${assignment.shiftTemplateName}</b>
+                                </div>
+                            </td>
+                            <td>⏱️ ${assignment.startTime} - ${assignment.endTime}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--color-danger);">Lỗi tải dữ liệu.</td></tr>';
+                });
+        }
+        
+        function changeDayView(val) {
+            renderDayView();
+        }
+
+        function getDaysInMonth(year, month) {
+            return new Date(year, month, 0).getDate();
+        }
+
+        function getFirstDayOfWeek(year, month) {
+            let day = new Date(year, month - 1, 1).getDay(); // 0 = CN, 1 = T2
+            return day === 0 ? 6 : day - 1; // Mon=0, Sun=6
+        }
+
+        function populateMonthSelectors() {
+            let now = new Date();
+            let currentYear = now.getFullYear();
+            let currentMonth = now.getMonth();
+            
+            let selectMonth = document.getElementById('month-view-select');
+            let selectMy = document.getElementById('my-view-month');
+            
+            [selectMonth, selectMy].forEach(sel => {
+                if (!sel) return;
+                sel.innerHTML = '';
+                
+                for (let i = -2; i <= 2; i++) {
+                    let d = new Date(currentYear, currentMonth + i, 1);
+                    let year = d.getFullYear();
+                    let month = d.getMonth() + 1;
+                    let monthStr = month < 10 ? '0' + month : month;
+                    let val = `${year}-${monthStr}`;
+                    
+                    let opt = document.createElement('option');
+                    opt.value = val;
+                    opt.innerText = `Tháng ${monthStr}/${year}`;
+                    if (i === 0) opt.selected = true;
+                    sel.appendChild(opt);
+                }
+            });
+        }
+
+        function renderMonthView() {
+            const selectVal = document.getElementById('month-view-select').value;
+            const parts = selectVal.split('-');
+            const year = parseInt(parts[0]);
+            const month = parseInt(parts[1]);
+            const monthStr = parts[1];
+            
+            const firstDay = getFirstDayOfWeek(year, month);
+            const daysInMonth = getDaysInMonth(year, month);
+            
+            document.getElementById('month-view-title').innerText = `Lịch Làm Việc Hệ Thống Tháng ${monthStr}/${year}`;
+            
+            const grid = document.getElementById('month-grid-days');
+            grid.innerHTML = '<div style="grid-column: span 7; text-align: center; padding: 20px;">Đang tải dữ liệu...</div>';
+            
+            const startDate = `${year}-${monthStr}-01`;
+            const endDate = `${year}-${monthStr}-${daysInMonth < 10 ? '0' + daysInMonth : daysInMonth}`;
+            
+            fetch(`/api/hr/schedule/range?start=${startDate}&end=${endDate}`)
+                .then(res => res.json())
+                .then(data => {
+                    grid.innerHTML = '';
+                    
+                    // Spacer cells for day alignment
+                    for (let i = 0; i < firstDay; i++) {
+                        const spacer = document.createElement('div');
+                        spacer.style.background = 'transparent';
+                        spacer.style.border = 'none';
+                        grid.appendChild(spacer);
+                    }
+                    
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dayStr = day < 10 ? '0' + day : day;
+                        const dateString = `${year}-${monthStr}-${dayStr}`;
+                        const dayAssignments = data.filter(a => a.date === dateString);
+                        
+                        const dayDiv = document.createElement('div');
+                        dayDiv.style.background = 'var(--bg-card)';
+                        dayDiv.style.border = '1px solid var(--border-color)';
+                        dayDiv.style.borderRadius = '8px';
+                        dayDiv.style.padding = '10px 8px';
+                        dayDiv.style.minHeight = '90px';
+                        dayDiv.style.cursor = 'pointer';
+                        dayDiv.style.display = 'flex';
+                        dayDiv.style.flexDirection = 'column';
+                        dayDiv.style.justifyContent = 'space-between';
+                        dayDiv.style.transition = 'all 0.2s';
+                        
+                        dayDiv.onmouseover = () => dayDiv.style.transform = 'translateY(-2px)';
+                        dayDiv.onmouseout = () => dayDiv.style.transform = 'none';
+                        dayDiv.onclick = () => {
+                            document.getElementById('day-view-picker').value = dateString;
+                            switchScheduleView('day');
+                        };
+                        
+                        // Highlight today
+                        let todayStr = new Date().toISOString().split('T')[0];
+                        if (dateString === todayStr) {
+                            dayDiv.style.borderColor = 'var(--color-primary)';
+                            dayDiv.style.boxShadow = '0 0 10px rgba(99, 102, 241, 0.3)';
+                        }
+                        
+                        let badgeHtml = '';
+                        if (dayAssignments.length > 0) {
+                            badgeHtml = `<span class="status-badge badge-blue" style="font-size: 11px; padding: 2px 6px;">${dayAssignments.length} Ca</span>`;
+                        } else {
+                            badgeHtml = `<span class="status-badge" style="font-size: 11px; padding: 2px 6px; background: rgba(255,255,255,0.03); color: var(--text-muted);">Trống</span>`;
+                        }
+                        
+                        dayDiv.innerHTML = `
+                            <div style="font-weight: 700; font-size: 14px; text-align: left;">${day}</div>
+                            <div style="text-align: right; margin-top: 10px;">${badgeHtml}</div>
+                        `;
+                        grid.appendChild(dayDiv);
+                    }
+                })
+                .catch(err => {
+                    grid.innerHTML = '<div style="grid-column: span 7; text-align: center; color: var(--color-danger); padding: 20px;">Lỗi tải dữ liệu.</div>';
+                });
+        }
+
+        function renderMyView() {
+            const selectVal = document.getElementById('my-view-month').value;
+            const parts = selectVal.split('-');
+            const year = parseInt(parts[0]);
+            const month = parseInt(parts[1]);
+            const monthStr = parts[1];
+            
+            const firstDay = getFirstDayOfWeek(year, month);
+            const daysInMonth = getDaysInMonth(year, month);
+            
+            const grid = document.getElementById('my-grid-days');
+            grid.innerHTML = '<div style="grid-column: span 7; text-align: center; padding: 20px;">Đang tải dữ liệu...</div>';
+            
+            fetch(`/api/hr/schedule/my-schedule?month=${selectVal}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("Chưa có hồ sơ nhân viên");
+                    return res.json();
+                })
+                .then(data => {
+                    grid.innerHTML = '';
+                    
+                    // Spacers
+                    for (let i = 0; i < firstDay; i++) {
+                        const spacer = document.createElement('div');
+                        spacer.style.background = 'transparent';
+                        spacer.style.border = 'none';
+                        grid.appendChild(spacer);
+                    }
+                    
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dayStr = day < 10 ? '0' + day : day;
+                        const dateString = `${year}-${monthStr}-${dayStr}`;
+                        const dayAssignments = data.filter(a => a.date === dateString);
+                        
+                        const dayDiv = document.createElement('div');
+                        dayDiv.style.background = 'var(--bg-card)';
+                        dayDiv.style.border = '1px solid var(--border-color)';
+                        dayDiv.style.borderRadius = '8px';
+                        dayDiv.style.padding = '8px';
+                        dayDiv.style.minHeight = '90px';
+                        dayDiv.style.display = 'flex';
+                        dayDiv.style.flexDirection = 'column';
+                        dayDiv.style.gap = '4px';
+                        
+                        let todayStr = new Date().toISOString().split('T')[0];
+                        if (dateString === todayStr) {
+                            dayDiv.style.borderColor = 'var(--color-primary)';
+                            dayDiv.style.boxShadow = '0 0 10px rgba(99, 102, 241, 0.3)';
+                        }
+                        
+                        let headerHtml = `<div style="font-weight: 700; font-size: 14px;">${day}</div>`;
+                        let shiftsHtml = '';
+                        
+                        dayAssignments.forEach(assignment => {
+                            let badgeClass = 'shift-morning';
+                            if (assignment.shiftTemplateId === 2) badgeClass = 'shift-afternoon';
+                            else if (assignment.shiftTemplateId === 3) badgeClass = 'shift-night';
+                            
+                            shiftsHtml += `
+                                <div class="shift-badge ${badgeClass}" style="margin: 0; padding: 4px; font-size: 11px; text-align: center;" title="${assignment.startTime} - ${assignment.endTime}">
+                                    <b>${assignment.shiftTemplateName}</b>
+                                </div>
+                            `;
+                        });
+                        
+                        dayDiv.innerHTML = headerHtml + (shiftsHtml ? shiftsHtml : '<div style="color: var(--text-muted); font-size: 11px; text-align: center; margin-top: 10px;">Nghỉ</div>');
+                        grid.appendChild(dayDiv);
+                    }
+                })
+                .catch(err => {
+                    grid.innerHTML = `<div style="grid-column: span 7; text-align: center; color: var(--text-muted); padding: 20px;">Không tìm thấy lịch làm việc cá nhân cho tài khoản này (hoặc là tài khoản Admin).</div>`;
+                });
+        }
+
+        function openShiftTemplateModal() {
+            loadShiftTemplates();
+            resetShiftTemplateForm();
+            document.getElementById('shiftTemplateModal').classList.add('active');
+        }
+
+        function closeShiftTemplateModal() {
+            document.getElementById('shiftTemplateModal').classList.remove('active');
+            window.location.reload();
+        }
+
+        function loadShiftTemplates() {
+            const tbody = document.getElementById('shift-template-tbody');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Đang tải...</td></tr>';
+            
+            fetch('/api/hr/shifts')
+                .then(res => res.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Chưa có ca làm việc nào.</td></tr>';
+                        return;
+                    }
+                    data.forEach(t => {
+                        const tr = document.createElement('tr');
+                        const escapedName = t.name.replace(/'/g, "\\'");
+                        tr.innerHTML = `
+                            <td><b>${t.name}</b></td>
+                            <td>⏱️ ${t.startTime} - ${t.endTime}</td>
+                            <td>${t.durationHours} h</td>
+                            <td>
+                                <div style="display: flex; gap: 6px;">
+                                    <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="editShiftTemplate(${t.id}, '${escapedName}', '${t.startTime}', '${t.endTime}', ${t.durationHours})">✏️</button>
+                                    <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 11px; background: var(--color-danger); color: white;" onclick="deleteShiftTemplate(${t.id})">🗑️</button>
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-danger);">Lỗi tải ca làm việc.</td></tr>';
+                });
+        }
+
+        function editShiftTemplate(id, name, startTime, endTime, durationHours) {
+            document.getElementById('templateId').value = id;
+            document.getElementById('templateName').value = name;
+            document.getElementById('templateStartTime').value = startTime;
+            document.getElementById('templateEndTime').value = endTime;
+            document.getElementById('templateDuration').value = durationHours;
+            document.getElementById('form-template-title').innerText = 'Chỉnh Sửa Ca Làm Việc';
+        }
+
+        function resetShiftTemplateForm() {
+            document.getElementById('templateId').value = '';
+            document.getElementById('templateName').value = '';
+            document.getElementById('templateStartTime').value = '';
+            document.getElementById('templateEndTime').value = '';
+            document.getElementById('templateDuration').value = '';
+            document.getElementById('form-template-title').innerText = 'Thêm Ca Làm Mới';
+        }
+
+        function calculateDuration() {
+            const startVal = document.getElementById('templateStartTime').value;
+            const endVal = document.getElementById('templateEndTime').value;
+            if (!startVal || !endVal) {
+                document.getElementById('templateDuration').value = '';
+                return;
+            }
+            const startParts = startVal.split(':');
+            const endParts = endVal.split(':');
+            const startMin = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+            let endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+            
+            if (endMin < startMin) {
+                endMin += 24 * 60; // Crosses midnight
+            }
+            const diffMin = endMin - startMin;
+            const duration = (diffMin / 60).toFixed(1);
+            document.getElementById('templateDuration').value = duration;
+        }
+
+        function saveShiftTemplate(e) {
+            e.preventDefault();
+            const id = document.getElementById('templateId').value;
+            const name = document.getElementById('templateName').value;
+            const startTime = document.getElementById('templateStartTime').value;
+            const endTime = document.getElementById('templateEndTime').value;
+            const durationHours = parseFloat(document.getElementById('templateDuration').value);
+
+            if (!name || !startTime || !endTime || isNaN(durationHours)) {
+                showToast("Vui lòng nhập đầy đủ thông tin.", "warning");
+                return;
+            }
+
+            const body = {
+                name: name,
+                startTime: startTime,
+                endTime: endTime,
+                durationHours: durationHours
+            };
+            if (id) {
+                body.id = parseInt(id);
+            }
+
+            fetch('/api/hr/shifts/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Lưu ca làm việc thành công.", "success");
+                    loadShiftTemplates();
+                    resetShiftTemplateForm();
+                } else {
+                    let errMsg = await response.text();
+                    showToast("Lỗi: " + errMsg, "warning");
+                }
+            })
+            .catch(error => {
+                showToast("Lỗi hệ thống: " + error, "error");
+            });
+        }
+
+        function deleteShiftTemplate(id) {
+            if (!confirm("Bạn có chắc chắn muốn xóa ca làm việc này?")) return;
+
+            fetch(`/api/hr/shifts/${id}`, {
+                method: 'DELETE'
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Xóa ca làm việc thành công.", "success");
+                    loadShiftTemplates();
+                    resetShiftTemplateForm();
+                } else {
+                    let errMsg = await response.text();
+                    showToast("Không thể xóa: " + errMsg, "warning");
+                }
+            })
+            .catch(error => {
+                showToast("Lỗi hệ thống: " + error, "error");
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            populateMonthSelectors();
+            let todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('day-view-picker').value = todayStr;
+        });
+    </script>
+</body>
+</html>

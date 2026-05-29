@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Đặt Hàng - Thu Mua</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .metric-red {
+            border-left: 4px solid var(--color-danger);
+        }
+        .text-price {
+            color: var(--color-success);
+            font-weight: 700;
+        }
+        .overdue-alert {
+            color: var(--color-danger);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Quản Lý Đặt Hàng</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Danh sách các đơn đặt hàng nhà cung cấp (PO)</p>
+                </div>
+                <button class="btn btn-primary" onclick="showToast('Đang hiển thị form tạo PO mới...', 'info')">
+                    ➕ Tạo PO Mới
+                </button>
+            </div>
+
+            <!-- Metric Header -->
+            <div class="dashboard-grid">
+                <div class="glass-panel metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px;">Tổng Giá Trị PO</p>
+                        <h3 class="metric-value" th:text="${'₫' + #numbers.formatDecimal(totalPoAmount / 1000000.0, 1, 1) + 'M'}">₫192.3M</h3>
+                    </div>
+                </div>
+                <div class="glass-panel metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px;">Chờ Nhận Hàng</p>
+                        <h3 class="metric-value" th:text="${pendingReceipt}">4</h3>
+                    </div>
+                </div>
+                <div class="glass-panel metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px;">Đã Nhận Hàng</p>
+                        <h3 class="metric-value" th:text="${receivedPo}">1</h3>
+                    </div>
+                </div>
+                <div class="glass-panel metric-red metric-card">
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 14px; color: var(--color-danger);">⚠️ Quá Hạn Giao</p>
+                        <h3 class="metric-value" style="color: var(--color-danger);" th:text="${overduePo}">5</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders list -->
+            <div class="glass-panel">
+                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Danh Sách Đơn Đặt Hàng</h4>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>MÃ PO</th>
+                                <th>TÊN NHÀ CUNG CẤP</th>
+                                <th>CHI NHÁNH</th>
+                                <th>TỔNG TIỀN</th>
+                                <th>HẠN GIAO</th>
+                                <th>TRẠNG THÁI</th>
+                                <th>HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="po : ${purchaseOrders}">
+                                <td th:text="${po.poCode}">PO-2024-001</td>
+                                <td th:text="${po.supplier.name}">Công ty Cổ phần Thực phẩm A</td>
+                                <td th:text="${po.branch.name}">Chi nhánh Trung Tâm</td>
+                                <td class="text-price" th:text="${'₫' + #numbers.formatDecimal(po.totalAmount / 1000000.0, 1, 1) + 'M'}">₫45.5M</td>
+                                <td>
+                                    <span th:text="${po.deliveryDeadline}">25/05/2024</span>
+                                    <div class="overdue-alert" th:if="${po.status == 'SENT' && po.deliveryDeadline != null && po.deliveryDeadline.isBefore(T(java.time.LocalDate).now())}">
+                                        ⚠️ Quá Hạn
+                                    </div>
+                                </td>
+                                <td>
+                                    <span th:class="${'status-badge ' + (po.status == 'RECEIVED' ? 'badge-green' : (po.status == 'SENT' ? 'badge-blue' : (po.status == 'DRAFT' ? 'badge-orange' : 'badge-red')))}" 
+                                          th:text="${po.status == 'RECEIVED' ? 'Nhận Hàng' : (po.status == 'SENT' ? 'Đã Gửi' : (po.status == 'DRAFT' ? 'Nháp' : 'Hủy'))}">
+                                        Đã Gửi
+                                    </span>
+                                </td>
+                                <td>
+                                     <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" 
+                                             th:data-id="${po.id}"
+                                             onclick="openPoDetailModal(this.getAttribute('data-id'))">
+                                         👁️ Xem / Xử lý
+                                     </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Procurement Detail & Actions Modal -->
+    <div class="modal-overlay" id="poDetailModal">
+        <div class="modal-box" style="width: 700px; max-width: 95vw;">
+            <div class="modal-header">
+                <h3 id="modalPoCode">Chi Tiết Đơn Đặt Hàng</h3>
+                <button class="modal-close" onclick="closePoDetailModal()">×</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; font-size: 14px;">
+                <div>
+                    <p style="color: var(--text-muted);">Nhà Cung Cấp:</p>
+                    <p id="modalSupplierName" style="font-weight: 600; margin-top: 2px;">Công ty A</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-muted);">Trạng Thế:</p>
+                    <p id="modalStatus" style="margin-top: 2px;"><span class="status-badge badge-orange">DRAFT</span></p>
+                </div>
+                <div>
+                    <p style="color: var(--text-muted);">Tổng Giá Trị:</p>
+                    <p id="modalTotalAmount" style="font-weight: 600; color: var(--color-success); margin-top: 2px;">₫0.00</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-muted);">Hạn Giao Hàng:</p>
+                    <p id="modalDeadline" style="font-weight: 600; margin-top: 2px;">2026-06-02</p>
+                </div>
+            </div>
+
+            <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Danh Sách Nguyên Liệu Đặt Hàng</h4>
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px;">
+                <table class="premium-table" style="margin: 0; font-size: 14px;">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Tên Nguyên Liệu</th>
+                            <th style="text-align: right;">Đơn Giá</th>
+                            <th style="text-align: right;">Số Lượng Đặt</th>
+                            <th style="text-align: right;" class="grn-input-header">Số Lượng Nhận thực tế</th>
+                        </tr>
+                    </thead>
+                    <tbody id="poItemsBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Contextual action blocks -->
+            <!-- Approve PO block -->
+            <div id="approveBlock" style="display: none; border-top: 1px solid var(--border-color); padding-top: 16px; text-align: right;">
+                <button class="btn btn-primary" onclick="submitApprovePo()">✔️ Duyệt & Gửi Đơn Hàng PO</button>
+            </div>
+
+            <!-- Create GRN receipt block -->
+            <div id="grnBlock" style="display: none; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 13px; color: var(--text-muted);">Người Nhận Hàng thực tế:</label>
+                    <input type="text" class="form-input" id="grnReceivedBy" placeholder="Nhập tên người nhận..." style="padding: 8px 12px; font-size: 14px; margin-top: 4px; width: 100%;">
+                </div>
+                <div style="text-align: right;">
+                    <button class="btn btn-primary" onclick="submitGrnPo()">📥 Xác Nhận Lập Phiếu GRN & Nhập Kho</button>
+                </div>
+            </div>
+
+            <!-- Invoice Matching block -->
+            <div id="matchBlock" style="display: none; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 13px; color: var(--text-muted);">Số tiền ghi trên Hóa Đơn thực tế (Invoice Amount):</label>
+                    <div style="position: relative; display: flex; align-items: center; margin-top: 4px; width: 100%;">
+                        <span style="position: absolute; left: 12px; color: var(--text-muted); font-size: 14px;">₫</span>
+                        <input type="number" class="form-input" id="invoiceAmountInput" placeholder="Nhập số tiền..." style="padding: 8px 12px 8px 30px; font-size: 14px; width: 100%;">
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button class="btn btn-primary" onclick="submitInvoiceMatch()">⚖️ Chạy Đối Chiếu 3 Bên & Thanh Toán</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let activePoId = null;
+        let activePoItems = [];
+
+        function openPoDetailModal(poId) {
+            activePoId = parseInt(poId);
+            document.getElementById('poDetailModal').classList.add('active');
+            
+            // Clear inputs
+            document.getElementById('grnReceivedBy').value = '';
+            document.getElementById('invoiceAmountInput').value = '';
+            
+            // Hide blocks
+            document.getElementById('approveBlock').style.display = 'none';
+            document.getElementById('grnBlock').style.display = 'none';
+            document.getElementById('matchBlock').style.display = 'none';
+            
+            fetch('/api/procurement/po/details/' + poId)
+            .then(res => {
+                if (!res.ok) throw new Error("Không load được thông tin chi tiết PO");
+                return res.json();
+            })
+            .then(data => {
+                document.getElementById('modalPoCode').innerText = "Chi Tiết Đơn Hàng " + data.poCode;
+                document.getElementById('modalSupplierName').innerText = data.supplierName;
+                document.getElementById('modalTotalAmount').innerText = "₫" + parseFloat(data.totalAmount).toLocaleString();
+                document.getElementById('modalDeadline').innerText = data.deliveryDeadline || "N/A";
+                
+                // Status badge
+                let statusHtml = '';
+                if (data.status === 'DRAFT') {
+                    statusHtml = '<span class="status-badge badge-orange">NHÁP</span>';
+                    document.getElementById('approveBlock').style.display = 'block';
+                } else if (data.status === 'SENT') {
+                    statusHtml = '<span class="status-badge badge-blue">ĐÃ GỬI PO</span>';
+                    document.getElementById('grnBlock').style.display = 'block';
+                } else if (data.status === 'RECEIVED') {
+                    statusHtml = '<span class="status-badge badge-green">ĐÃ NHẬN HÀNG (GRN)</span>';
+                    document.getElementById('matchBlock').style.display = 'block';
+                } else if (data.status === 'CANCELLED') {
+                    statusHtml = '<span class="status-badge badge-red">HỦY ĐƠN</span>';
+                }
+                document.getElementById('modalStatus').innerHTML = statusHtml;
+                
+                // Render items table
+                activePoItems = data.items;
+                let tbody = document.getElementById('poItemsBody');
+                tbody.innerHTML = '';
+                
+                let isGrnState = (data.status === 'SENT');
+                document.querySelectorAll('.grn-input-header').forEach(el => el.style.display = isGrnState ? 'table-cell' : 'none');
+                
+                data.items.forEach(item => {
+                    let tr = document.createElement('tr');
+                    
+                    let grnCellHtml = '';
+                    if (isGrnState) {
+                        grnCellHtml = `
+                            <td style="text-align: right;">
+                                <input type="number" class="form-input grn-qty-input" 
+                                       data-item-id="${item.itemId}" 
+                                       value="${item.quantity}" 
+                                       style="width: 80px; padding: 4px 8px; font-size: 13px; text-align: right; display: inline-block;">
+                            </td>`;
+                    } else {
+                        grnCellHtml = '<td style="display:none;"></td>';
+                    }
+                    
+                    tr.innerHTML = `
+                        <td>${item.sku}</td>
+                        <td>${item.itemName}</td>
+                        <td style="text-align: right;">₫${parseFloat(item.unitPrice).toLocaleString()}</td>
+                        <td style="text-align: right; font-weight: 600;">${item.quantity} ${item.unit}</td>
+                        ${grnCellHtml}
+                    `;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(err => {
+                showToast("Lỗi tải chi tiết PO: " + err.message, "error");
+            });
+        }
+        
+        function closePoDetailModal() {
+            document.getElementById('poDetailModal').classList.remove('active');
+        }
+        
+        function submitApprovePo() {
+            if (!activePoId) return;
+            fetch('/api/procurement/po/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ poId: activePoId })
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã duyệt PO và tự động gửi PDF đơn đặt hàng tới Email nhà cung cấp thành công!", "success");
+                    closePoDetailModal();
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    let text = await res.text();
+                    showToast("Lỗi duyệt PO: " + text, "warning");
+                }
+            })
+            .catch(err => showToast("Lỗi hệ thống: " + err, "error"));
+        }
+        
+        function submitGrnPo() {
+            if (!activePoId) return;
+            let receivedBy = document.getElementById('grnReceivedBy').value.trim();
+            if (!receivedBy) {
+                showToast("Vui lòng nhập tên người nhận hàng thực tế!", "warning");
+                return;
+            }
+            
+            let itemIds = [];
+            let acceptedQty = [];
+            let rejectedQty = [];
+            
+            let inputs = document.querySelectorAll('.grn-qty-input');
+            inputs.forEach(input => {
+                let itemId = parseInt(input.getAttribute('data-item-id'));
+                let val = parseFloat(input.value);
+                if (isNaN(val) || val < 0) {
+                    val = 0;
+                }
+                
+                let originalItem = activePoItems.find(i => i.itemId === itemId);
+                let ordered = originalItem ? originalItem.quantity : val;
+                
+                itemIds.push(itemId);
+                acceptedQty.push(val);
+                rejectedQty.push(Math.max(0.0, ordered - val));
+            });
+            
+            fetch('/api/procurement/po/grn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    poId: activePoId,
+                    receivedBy: receivedBy,
+                    itemIds: itemIds,
+                    acceptedQty: acceptedQty,
+                    rejectedQty: rejectedQty
+                })
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã lập phiếu GRN nhận hàng & cập nhật tồn kho chi nhánh thành công!", "success");
+                    closePoDetailModal();
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    let text = await res.text();
+                    showToast("Lỗi nhận hàng: " + text, "warning");
+                }
+            })
+            .catch(err => showToast("Lỗi hệ thống: " + err, "error"));
+        }
+        
+        function submitInvoiceMatch() {
+            if (!activePoId) return;
+            let amountVal = parseFloat(document.getElementById('invoiceAmountInput').value);
+            if (isNaN(amountVal) || amountVal <= 0) {
+                showToast("Vui lòng nhập số tiền hóa đơn hợp lệ!", "warning");
+                return;
+            }
+            
+            fetch('/api/procurement/po/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    poId: activePoId,
+                    actualInvoiceAmount: amountVal
+                })
+            })
+            .then(async res => {
+                if (res.ok) {
+                    let matched = await res.json();
+                    if (matched) {
+                        showToast("Đối chiếu 3 bên THÀNH CÔNG! Số tiền khớp hoàn toàn. Cho phép thanh toán hóa đơn.", "success");
+                        closePoDetailModal();
+                        setTimeout(() => window.location.reload(), 2500);
+                    } else {
+                        showToast("⚠️ CẢNH BÁO ĐỐI CHIẾU THẤT BẠI: Số tiền hóa đơn thực tế lệch quá 2% so với giá trị nhận hàng GRN thực tế! Hệ thống đã khóa lệnh thanh toán.", "error");
+                    }
+                } else {
+                    let text = await res.text();
+                    showToast("Lỗi đối chiếu: " + text, "warning");
+                }
+            })
+            .catch(err => showToast("Lỗi hệ thống: " + err, "error"));
+        }
+    </script>
+</body>
+</html>

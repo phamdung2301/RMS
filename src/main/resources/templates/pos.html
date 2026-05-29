@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>LiteFlow POS - Thu Ngân</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .pos-grid {
+            display: flex;
+            gap: 24px;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+        .tables-section {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        .order-cart-section {
+            width: 400px;
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass-blur);
+            border-left: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: var(--shadow-premium);
+            border-radius: 16px;
+        }
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 16px;
+        }
+        .table-card {
+            aspect-ratio: 1.2;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            border: 2px solid transparent;
+        }
+        .table-card.selected {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+            transform: scale(1.05);
+        }
+        .table-card.EMPTY {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--color-success);
+        }
+        .table-card.OCCUPIED {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--color-danger);
+        }
+        .table-card.RESERVED {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--color-warning);
+        }
+        .status-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+        }
+        .cart-items {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .cart-item {
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        /* Product catalog */
+        .btn-variant-selector {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-variant-selector:hover {
+            border-color: var(--color-primary) !important;
+            background: rgba(99, 102, 241, 0.15) !important;
+            transform: scale(1.03);
+        }
+        .active-tab {
+            background: var(--color-primary) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        /* Table flashing animation */
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .flash-alert {
+            animation: pulse-yellow 1.5s infinite;
+            border: 2px solid var(--color-warning) !important;
+        }
+
+        /* Mobile Responsive POS elements */
+        .mobile-pos-tabs {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .mobile-pos-tabs button {
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .mobile-pos-tabs button.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .mobile-pos-tabs {
+                display: grid;
+            }
+            .pos-grid {
+                flex-direction: column;
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .order-cart-section {
+                width: 100% !important;
+                border-left: none !important;
+                border-top: 1px solid var(--border-color);
+                display: none !important; /* Controlled by Tab Selector */
+            }
+            .tables-section {
+                display: block !important; /* Controlled by Tab Selector */
+            }
+            .category-tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+                padding-bottom: 8px;
+                width: 100%;
+                -webkit-overflow-scrolling: touch;
+            }
+            .category-tabs button {
+                flex-shrink: 0;
+            }
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <!-- Audio alarm for KDS ready -->
+    <audio id="beepAudio" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Sơ Đồ Bàn</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Chi nhánh hiện tại: Trung Tâm</p>
+                </div>
+                <div class="status-legend">
+                    <span style="color: var(--color-success);">● Trống (Empty)</span>
+                    <span style="color: var(--color-danger);">● Có khách (Occupied)</span>
+                    <span style="color: var(--color-warning);">● Đã đặt (Reserved)</span>
+                </div>
+            </div>
+
+            <!-- Mobile Tab Controller -->
+            <div class="mobile-pos-tabs">
+                <button id="mobile-tab-map-btn" class="active" onclick="switchMobilePosTab('map')">🛋️ Sơ đồ bàn</button>
+                <button id="mobile-tab-cart-btn" onclick="switchMobilePosTab('cart')">🛒 Giỏ hàng (<span id="mobileCartCount">0</span>)</button>
+            </div>
+
+            <!-- POS Grid -->
+            <div class="pos-grid">
+                <!-- Tables Section -->
+                <div class="tables-section">
+                    <div class="glass-panel" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-wrap: wrap; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <h3 style="font-size: 20px; font-weight: 700; margin: 0;">🛋️ Sơ Đồ Bàn</h3>
+                                <!-- Dropdown chọn khu vực -->
+                                <select id="areaFilterSelect" onchange="filterTablesByArea(this.value)" 
+                                        style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: white; font-size: 13px; outline: none; cursor: pointer; transition: all 0.3s;">
+                                    <option value="ALL">🌐 Tất Cả Khu Vực</option>
+                                    <option th:each="r : ${rooms}" th:value="${r.id}" th:text="${r.name}">Tầng 1</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <button sec:authorize="hasAnyRole('ADMIN', 'MANAGER')" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;" onclick="openTableManager()">⚙️ Thiết lập sơ đồ</button>
+                                <span style="font-size: 13px; color: var(--text-muted);">Chọn bàn hoạt động để gọi món</span>
+                            </div>
+                        </div>
+                        <div class="table-grid">
+                            <div th:each="table : ${tables}" 
+                                 th:id="${'table-card-' + table.id}"
+                                 th:class="${'table-card ' + table.status}"
+                                 th:data-id="${table.id}"
+                                 th:data-name="${table.name}"
+                                 th:data-status="${table.status}"
+                                 th:data-room-id="${table.room != null ? table.room.id : ''}"
+                                 onclick="selectTable(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-status'))">
+                                <span style="font-size: 18px;" th:text="${table.name}">Bàn 1</span>
+                                <span style="font-size: 12px; margin-top: 4px;" 
+                                      th:text="${table.status == 'EMPTY' ? 'Trống' : (table.status == 'OCCUPIED' ? table.guestCount + ' Khách' : 'Đã đặt')}">Trống</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Menu Section -->
+                    <div id="posMenuSection" class="glass-panel" style="display: none; flex-direction: column; gap: 16px; margin-top: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 20px; font-weight: 700;">🍽️ Thực Đơn Gọi Món - <span id="menuTableName" style="color: var(--color-primary);">Bàn 1</span></h3>
+                            
+                            <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                                <!-- Search Input -->
+                                <div style="position: relative;">
+                                    <input type="text" id="menuSearchInput" onkeyup="searchProducts()" placeholder="🔍 Tìm món ăn..." 
+                                           style="padding: 6px 12px 6px 30px; border-radius: 18px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.03); color: white; font-size: 13px; outline: none; width: 180px; transition: all 0.3s;">
+                                </div>
+                                
+                                <!-- Category Tabs -->
+                                <div class="category-tabs" style="display: flex; gap: 8px;">
+                                    <button class="btn btn-secondary active-tab" onclick="filterCategory('ALL')">Tất Cả</button>
+                                    <button th:each="cat : ${categories}" 
+                                            class="btn btn-secondary" 
+                                            th:text="${cat.name}" 
+                                            th:data-cat-id="${cat.id}"
+                                            onclick="filterCategory(this.getAttribute('data-cat-id'))">Món chính</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Products Grid Grouped by Category -->
+                        <div class="menu-products-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                            <div th:each="prod : ${products}" 
+                                 class="product-card" 
+                                 th:data-category-id="${prod.category.id}" 
+                                 style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; display: flex; gap: 12px; padding: 12px; transition: all 0.3s;">
+                                
+                                <!-- Product Image -->
+                                <div style="width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: rgba(0,0,0,0.2);">
+                                    <img th:src="${prod.imagePath}" style="width: 100%; height: 100%; object-fit: cover;" th:alt="${prod.name}">
+                                </div>
+                                
+                                <!-- Product Details -->
+                                <div style="display: flex; flex-direction: column; justify-content: space-between; flex-grow: 1;">
+                                    <div>
+                                        <h4 th:text="${prod.name}" style="font-size: 15px; font-weight: 600; margin-bottom: 2px;">Phở Bò</h4>
+                                        <p th:text="${prod.description}" style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 6px;">Mô tả món ăn</p>
+                                    </div>
+                                    
+                                    <!-- Variant Buttons -->
+                                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                        <button th:each="v : ${variants}" 
+                                                th:if="${v.product.id == prod.id}" 
+                                                class="btn btn-secondary btn-variant-selector" 
+                                                th:data-id="${v.id}"
+                                                onclick="addProductToCart(this.getAttribute('data-id'))"
+                                                style="padding: 4px 6px; font-size: 10px; font-weight: 500; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.02); height: auto; display: inline-flex; align-items: center; justify-content: center; min-height: unset; gap: 2px;">
+                                            <span th:text="${v.name}">Cỡ Vừa</span>: 
+                                            <b style="color: var(--color-success);" th:text="${#numbers.formatDecimal(v.price / 1000, 0, 'COMMA', 0, 'POINT')} + 'K'">45K</b>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Panel -->
+                <div class="order-cart-section">
+                    <h3 id="panelTitle" style="font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        Chọn bàn để gọi món
+                    </h3>
+
+                    <!-- Cart Content -->
+                    <div class="cart-items" id="cartContainer">
+                        <p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Chưa chọn bàn hoặc bàn trống.</p>
+                    </div>
+
+                    <!-- Cart Controls -->
+                    <div id="cartControls" style="display: none; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; margin: 8px 0;">
+                            <span>Tổng Cộng:</span>
+                            <span id="cartTotal">₫0</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="sendKitchen()">👨‍🍳 Gửi Bếp</button>
+                            <button class="btn btn-secondary" onclick="showToast('Tính năng tách hóa đơn. Chọn món cần tách...', 'info')">✂️ Tách Bill</button>
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="requestCheckout()">
+                            💳 Thanh Toán VNPay QR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VNPay QR Modal -->
+    <div class="modal-overlay" id="vnpayModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Thanh Toán VNPay QR Sandbox</h3>
+                <button class="modal-close" onclick="closeVNPayModal()">×</button>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;">
+                <p>Quét mã QR Code giả lập dưới đây để hoàn tất thanh toán.</p>
+                <!-- Pre-generated premium visual QR Code placeholder -->
+                <div style="width: 180px; height: 180px; background: white; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=LITEFLOW-PAY-SANDBOX" style="width: 100%; height: 100%;" alt="VNPay QR">
+                </div>
+                <div style="font-size: 18px; font-weight: 700; color: var(--color-success);" id="modalPayAmount">
+                    ₫0
+                </div>
+                <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="confirmSandboxPayment()">
+                    Xác nhận đã quét (Thành công)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table & Room Manager Modal -->
+    <div class="modal-overlay" id="tableManagerModal">
+        <div class="modal-box" style="width: 800px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 20px; font-weight: 700;">⚙️ Thiết Lập Sơ Đồ Phòng / Bàn</h3>
+                <button class="modal-close" onclick="closeTableManagerModal()">×</button>
+            </div>
+            
+            <!-- Tabs -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <button class="btn btn-secondary active-tab" id="tabRoomsBtn" onclick="switchManagerTab('rooms')" style="padding: 6px 16px; font-size: 13px;">🚪 Khu vực / Tầng</button>
+                <button class="btn btn-secondary" id="tabTablesBtn" onclick="switchManagerTab('tables')" style="padding: 6px 16px; font-size: 13px;">🛋️ Quản lý bàn</button>
+            </div>
+            
+            <!-- Tab Contents -->
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
+                <!-- Tab 1: Rooms -->
+                <div id="managerTabRooms" style="display: block;">
+                    <!-- Add Room Form -->
+                    <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                        <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;">➕ Thêm Phòng / Khu vực mới</h4>
+                        <div style="display: flex; gap: 12px; align-items: flex-end;">
+                            <div class="form-group" style="flex-grow: 1; margin-bottom: 0;">
+                                <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Tên khu vực</label>
+                                <input type="text" id="newRoomName" class="form-input" placeholder="Ví dụ: Tầng 3, Sân thượng..." style="padding: 8px 12px;">
+                            </div>
+                            <button class="btn btn-primary" onclick="submitAddRoom()" style="padding: 8px 16px; height: 38px;">Lưu</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Rooms List Table -->
+                    <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">📋 Danh sách Phòng / Khu vực</h4>
+                    <table class="premium-table" style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 8px;">ID</th>
+                                <th style="padding: 8px;">Tên phòng / Khu vực</th>
+                                <th style="padding: 8px; text-align: right;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="managerRoomsList">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Tab 2: Tables -->
+                <div id="managerTabTables" style="display: none;">
+                    <!-- Add/Edit Table Form -->
+                    <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                        <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;" id="tableFormTitle">➕ Thêm Bàn mới</h4>
+                        <input type="hidden" id="editTableId">
+                        <div style="display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 12px; align-items: flex-end;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Tên bàn</label>
+                                <input type="text" id="newTableName" class="form-input" placeholder="Ví dụ: Bàn 10, Bàn VIP 3..." style="padding: 8px 12px;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Phòng / Khu vực</label>
+                                <select id="newTableRoomId" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px;">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Số chỗ ngồi</label>
+                                <input type="number" id="newTableCapacity" class="form-input" value="4" min="1" max="100" style="padding: 8px 12px;">
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-primary" onclick="submitTableForm()" style="padding: 8px 16px; height: 38px;">Lưu</button>
+                                <button class="btn btn-secondary" id="cancelTableEditBtn" onclick="resetTableForm()" style="padding: 8px 12px; height: 38px; display: none;">Hủy</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tables List Table -->
+                    <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">📋 Danh sách bàn</h4>
+                    <table class="premium-table" style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 8px;">Tên bàn</th>
+                                <th style="padding: 8px;">Phòng / Khu vực</th>
+                                <th style="padding: 8px;">Số chỗ ngồi</th>
+                                <th style="padding: 8px;">Trạng thái</th>
+                                <th style="padding: 8px; text-align: right;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="managerTablesList">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        let currentTableId = null;
+        let currentSessionId = null;
+
+        // WebSocket Integration
+        let wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        let socket = new WebSocket(wsProtocol + window.location.host + '/ws/kds');
+        
+        socket.onmessage = function(event) {
+            let data = event.data;
+            if (data.startsWith("KDS_READY_ALERT:")) {
+                let tableName = data.substring(16);
+                // Play sound
+                document.getElementById('beepAudio').play();
+                // Alert visual flash
+                showToast("🍳 Món của [" + tableName + "] đã nấu xong! Vui lòng bưng ra cho khách.", "success");
+            } else if (data === "ORDER_STATE_CHANGED" || data === "NEW_ORDER_SUBMITTED") {
+                // Refresh table grid state dynamically
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        };
+
+        function selectTable(tableId, tableName, status) {
+            currentTableId = tableId;
+            document.querySelectorAll('.table-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById('table-card-' + tableId).classList.add('selected');
+
+            document.getElementById('panelTitle').innerText = tableName + " (" + (status === 'EMPTY' ? 'Trống' : 'Đang phục vụ') + ")";
+
+            if (status === 'EMPTY') {
+                document.getElementById('cartContainer').innerHTML = `
+                    <div style="text-align: center; padding-top: 40px;">
+                        <button class="btn btn-primary" onclick="openSession(${tableId})">🚪 Mở ca (Check-in)</button>
+                    </div>
+                `;
+                document.getElementById('posMenuSection').style.display = 'none';
+                document.getElementById('cartControls').style.display = 'none';
+            } else {
+                fetchActiveCart(tableId);
+            }
+        }
+
+        function openSession(tableId) {
+            fetch('/api/pos/session/open?tableId=' + tableId, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    showToast("Đã mở ca thành công cho bàn.", "success");
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                });
+        }
+
+        let checkoutAmount = 0;
+
+        function fetchActiveCart(tableId) {
+            fetch('/api/pos/session/active?tableId=' + tableId)
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error("No active session");
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    currentSessionId = data.sessionId;
+                    let itemsHtml = "";
+                    if (data.items.length === 0) {
+                        itemsHtml = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Bàn này chưa gọi món.</p>`;
+                    } else {
+                        data.items.forEach(item => {
+                            let statusText = "";
+                            let statusClass = "";
+                            if (item.status === 'PENDING') {
+                                statusText = "Chờ gửi bếp";
+                                statusClass = "badge-orange";
+                            } else if (item.status === 'SENT') {
+                                statusText = "Chờ làm";
+                                statusClass = "badge-orange";
+                            } else if (item.status === 'COOKING') {
+                                statusText = "Đang nấu";
+                                statusClass = "badge-blue";
+                            } else if (item.status === 'READY') {
+                                statusText = "Ready (Xong)";
+                                statusClass = "badge-green";
+                            } else if (item.status === 'SERVED') {
+                                statusText = "Đã bưng";
+                                statusClass = "badge-green";
+                            } else if (item.status === 'CANCELLED') {
+                                statusText = "Đã hủy";
+                                statusClass = "badge-red";
+                            } else {
+                                statusText = item.status;
+                                statusClass = "badge-orange";
+                            }
+
+                            itemsHtml += `
+                                <div class="cart-item">
+                                    <div><b>${item.productName} (${item.variantName})</b><br><span style="font-size:12px; color:var(--text-muted)">${item.notes ? item.notes : ''}</span></div>
+                                    <div>${item.quantity} x ${(item.price / 1000)}K <span class="status-badge ${statusClass}">${statusText}</span></div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    document.getElementById('cartContainer').innerHTML = itemsHtml;
+                    document.getElementById('cartTotal').innerText = "₫" + data.total.toLocaleString();
+                    
+                    // Update mobile cart badge count!
+                    const mobileCountSpan = document.getElementById('mobileCartCount');
+                    if (mobileCountSpan) {
+                        let totalQty = 0;
+                        data.items.forEach(item => {
+                            if (item.status !== 'CANCELLED') {
+                                totalQty += item.quantity;
+                            }
+                        });
+                        mobileCountSpan.innerText = totalQty;
+                    }
+                    
+                    document.getElementById('menuTableName').innerText = data.tableName;
+                    document.getElementById('posMenuSection').style.display = 'flex';
+                    document.getElementById('cartControls').style.display = 'flex';
+                })
+                .catch(err => {
+                    const mobileCountSpan = document.getElementById('mobileCartCount');
+                    if (mobileCountSpan) {
+                        mobileCountSpan.innerText = '0';
+                    }
+                    document.getElementById('cartContainer').innerHTML = `
+                        <div style="text-align: center; padding-top: 40px;">
+                            <button class="btn btn-primary" onclick="openSession(${tableId})">🚪 Mở ca (Check-in)</button>
+                        </div>
+                    `;
+                    document.getElementById('posMenuSection').style.display = 'none';
+                    document.getElementById('cartControls').style.display = 'none';
+                });
+        }
+
+        function addProductToCart(variantId) {
+            fetch(`/api/pos/order/add?sessionId=${currentSessionId}&variantId=${variantId}&quantity=1&notes=`, { method: 'POST' })
+                .then(res => res.json())
+                .then(detail => {
+                    showToast("Đã thêm món vào giỏ hàng.", "success");
+                    fetchActiveCart(currentTableId);
+                });
+        }
+
+        function filterCategory(catId) {
+            // Clear search input when switching category
+            const searchInput = document.getElementById('menuSearchInput');
+            if (searchInput) searchInput.value = "";
+
+            const tabs = document.querySelectorAll('.category-tabs button');
+            tabs.forEach(tab => tab.classList.remove('active-tab'));
+            
+            // Find current event target and set active
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active-tab');
+            } else {
+                tabs[0].classList.add('active-tab');
+            }
+            
+            const cards = document.querySelectorAll('.product-card');
+            cards.forEach(card => {
+                if (catId === 'ALL') {
+                    card.style.display = 'flex';
+                } else {
+                    if (card.getAttribute('data-category-id') === catId) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        function searchProducts() {
+            let query = document.getElementById('menuSearchInput').value.trim().toLowerCase();
+            
+            // Switch category tab to 'ALL' visual active state when searching
+            if (query !== "") {
+                const tabs = document.querySelectorAll('.category-tabs button');
+                tabs.forEach(tab => tab.classList.remove('active-tab'));
+                tabs[0].classList.add('active-tab');
+            }
+            
+            const cards = document.querySelectorAll('.product-card');
+            cards.forEach(card => {
+                let productName = card.querySelector('h4').innerText.toLowerCase();
+                if (productName.includes(query)) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function sendKitchen() {
+            fetch(`/api/pos/order/send?sessionId=${currentSessionId}`, { method: 'POST' })
+                .then(() => {
+                    showToast("Đã chuyển danh sách chế biến xuống Bếp thành công.", "success");
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                });
+        }
+
+        function requestCheckout() {
+            fetch(`/api/pos/checkout/vnpay?sessionId=${currentSessionId}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    let amountStr = document.getElementById('cartTotal').innerText;
+                    checkoutAmount = parseFloat(amountStr.replace(/[^\d]/g, ''));
+                    document.getElementById('modalPayAmount').innerText = amountStr;
+                    document.getElementById('vnpayModal').classList.add('active');
+                });
+        }
+
+        function closeVNPayModal() {
+            document.getElementById('vnpayModal').classList.remove('active');
+        }
+
+        function confirmSandboxPayment() {
+            fetch(`/api/pos/checkout/confirm?sessionId=${currentSessionId}&amount=${checkoutAmount}`, { method: 'POST' })
+                .then(() => {
+                    showToast("Thanh toán thành công. Bàn được giải phóng.", "success");
+                    closeVNPayModal();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                });
+        }
+
+        let roomsCache = [];
+
+        function openTableManager() {
+            document.getElementById('tableManagerModal').classList.add('active');
+            switchManagerTab('rooms');
+        }
+
+        function closeTableManagerModal() {
+            document.getElementById('tableManagerModal').classList.remove('active');
+            window.location.reload();
+        }
+
+        function switchManagerTab(tab) {
+            const roomsTabBtn = document.getElementById('tabRoomsBtn');
+            const tablesTabBtn = document.getElementById('tabTablesBtn');
+            const roomsContent = document.getElementById('managerTabRooms');
+            const tablesContent = document.getElementById('managerTabTables');
+
+            if (tab === 'rooms') {
+                roomsTabBtn.classList.add('active-tab');
+                tablesTabBtn.classList.remove('active-tab');
+                roomsContent.style.display = 'block';
+                tablesContent.style.display = 'none';
+                loadRooms();
+            } else {
+                tablesTabBtn.classList.add('active-tab');
+                roomsTabBtn.classList.remove('active-tab');
+                tablesContent.style.display = 'block';
+                roomsContent.style.display = 'none';
+                loadRooms().then(loadTables);
+            }
+        }
+
+        function loadRooms() {
+            return fetch('/api/pos/rooms')
+                .then(res => res.json())
+                .then(rooms => {
+                    roomsCache = rooms;
+                    
+                    let selectHtml = "";
+                    rooms.forEach(r => {
+                        selectHtml += `<option value="${r.id}">${r.name}</option>`;
+                    });
+                    document.getElementById('newTableRoomId').innerHTML = selectHtml;
+
+                    let listHtml = "";
+                    if (rooms.length === 0) {
+                        listHtml = `<tr><td colspan="3" style="text-align:center; padding: 12px; color: var(--text-muted);">Chưa có phòng/khu vực nào.</td></tr>`;
+                    } else {
+                        rooms.forEach(r => {
+                            listHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px;">${r.id}</td>
+                                    <td style="padding: 10px; font-weight:600;">${r.name}</td>
+                                    <td style="padding: 10px; text-align: right;">
+                                        <button class="btn btn-danger" onclick="deleteRoom(${r.id})" style="padding: 4px 8px; font-size:11px; border-radius:6px; display:inline-flex;">🗑️ Xóa</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    document.getElementById('managerRoomsList').innerHTML = listHtml;
+                });
+        }
+
+        function submitAddRoom() {
+            let nameInput = document.getElementById('newRoomName');
+            let name = nameInput.value.trim();
+            if (!name) {
+                showToast("Vui lòng nhập tên phòng/khu vực.", "error");
+                return;
+            }
+            fetch(`/api/pos/rooms/add?name=${encodeURIComponent(name)}`, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
+                    return res.json();
+                })
+                .then(room => {
+                    nameInput.value = "";
+                    loadRooms();
+                    showToast("Đã thêm khu vực thành công.", "success");
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+
+        function deleteRoom(roomId) {
+            if (!confirm("Bạn có chắc chắn muốn xóa khu vực này? Tất cả bàn thuộc khu vực này phải được xóa hoặc chuyển đi trước.")) {
+                return;
+            }
+            fetch(`/api/pos/rooms/delete?roomId=${roomId}`, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
+                    loadRooms();
+                    showToast("Đã xóa khu vực thành công.", "success");
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+
+        function loadTables() {
+            fetch('/api/pos/tables')
+                .then(res => res.json())
+                .then(tables => {
+                    let listHtml = "";
+                    if (tables.length === 0) {
+                        listHtml = `<tr><td colspan="5" style="text-align:center; padding: 12px; color: var(--text-muted);">Chưa có bàn nào.</td></tr>`;
+                    } else {
+                        tables.forEach(t => {
+                            let statusText = t.status === 'EMPTY' ? 'Trống' : (t.status === 'OCCUPIED' ? 'Có khách' : 'Đã đặt');
+                            let statusClass = t.status === 'EMPTY' ? 'badge-green' : (t.status === 'OCCUPIED' ? 'badge-red' : 'badge-orange');
+                            listHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px; font-weight:600;">${t.name}</td>
+                                    <td style="padding: 10px;">${t.room ? t.room.name : ''}</td>
+                                    <td style="padding: 10px;">${t.capacity} chỗ</td>
+                                    <td style="padding: 10px;"><span class="status-badge ${statusClass}" style="padding: 2px 8px; font-size:11px;">${statusText}</span></td>
+                                    <td style="padding: 10px; text-align: right; display: flex; gap: 6px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" onclick="editTable(${t.id}, '${t.name}', ${t.room ? t.room.id : 0}, ${t.capacity})" style="padding: 4px 8px; font-size:11px; border-radius:6px;">✏️ Sửa</button>
+                                        <button class="btn btn-danger" onclick="deleteTable(${t.id})" style="padding: 4px 8px; font-size:11px; border-radius:6px;">🗑️ Xóa</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    document.getElementById('managerTablesList').innerHTML = listHtml;
+                });
+        }
+
+        function editTable(id, name, roomId, capacity) {
+            document.getElementById('editTableId').value = id;
+            document.getElementById('newTableName').value = name;
+            document.getElementById('newTableRoomId').value = roomId;
+            document.getElementById('newTableCapacity').value = capacity;
+            document.getElementById('tableFormTitle').innerText = "✏️ Cập nhật bàn #" + id;
+            document.getElementById('cancelTableEditBtn').style.display = 'inline-flex';
+        }
+
+        function resetTableForm() {
+            document.getElementById('editTableId').value = "";
+            document.getElementById('newTableName').value = "";
+            document.getElementById('newTableCapacity').value = "4";
+            document.getElementById('tableFormTitle').innerText = "➕ Thêm Bàn mới";
+            document.getElementById('cancelTableEditBtn').style.display = 'none';
+        }
+
+        function submitTableForm() {
+            let id = document.getElementById('editTableId').value;
+            let name = document.getElementById('newTableName').value.trim();
+            let roomId = document.getElementById('newTableRoomId').value;
+            let capacity = document.getElementById('newTableCapacity').value;
+
+            if (!name) {
+                showToast("Vui lòng nhập tên bàn.", "error");
+                return;
+            }
+            if (!roomId) {
+                showToast("Vui lòng chọn phòng/khu vực.", "error");
+                return;
+            }
+
+            let url = id 
+                ? `/api/pos/tables/update?tableId=${id}&name=${encodeURIComponent(name)}&roomId=${roomId}&capacity=${capacity}`
+                : `/api/pos/tables/add?name=${encodeURIComponent(name)}&roomId=${roomId}&capacity=${capacity}`;
+
+            fetch(url, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
+                    resetTableForm();
+                    loadTables();
+                    showToast(id ? "Đã cập nhật bàn thành công." : "Đã thêm bàn mới thành công.", "success");
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+
+        function deleteTable(tableId) {
+            if (!confirm("Bạn có chắc chắn muốn xóa bàn này?")) {
+                return;
+            }
+            fetch(`/api/pos/tables/delete?tableId=${tableId}`, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
+                    loadTables();
+                    showToast("Đã xóa bàn thành công.", "success");
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+
+        function filterTablesByArea(roomId) {
+            const cards = document.querySelectorAll('.table-card');
+            cards.forEach(card => {
+                const cardRoomId = card.getAttribute('data-room-id');
+                if (roomId === 'ALL') {
+                    card.style.display = 'flex';
+                } else {
+                    if (cardRoomId === roomId) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        // Mobile POS Tab switcher
+        function switchMobilePosTab(tab) {
+            const mapBtn = document.getElementById('mobile-tab-map-btn');
+            const cartBtn = document.getElementById('mobile-tab-cart-btn');
+            const mapSection = document.querySelector('.tables-section');
+            const cartSection = document.querySelector('.order-cart-section');
+
+            if (tab === 'map') {
+                mapBtn.classList.add('active');
+                cartBtn.classList.remove('active');
+                mapSection.style.setProperty('display', 'block', 'important');
+                cartSection.style.setProperty('display', 'none', 'important');
+            } else {
+                cartBtn.classList.add('active');
+                mapBtn.classList.remove('active');
+                cartSection.style.setProperty('display', 'flex', 'important');
+                mapSection.style.setProperty('display', 'none', 'important');
+            }
+        }
+    </script>
+</body>
+</html>

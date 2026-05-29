@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Kho - LiteFlow</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .low-stock-alert {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--color-danger);
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Quản Lý Tồn Kho</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Quản lý và điều chỉnh số lượng nguyên vật liệu tại chi nhánh</p>
+                </div>
+                <button class="btn btn-primary" onclick="showToast('Mở form điều chuyển kho nội bộ...', 'info')">
+                    🔄 Yêu Cầu Điều Chuyển
+                </button>
+            </div>
+
+            <!-- Active Alerts (Low Stock Warning) -->
+            <div class="low-stock-alert" th:if="${!#lists.isEmpty(lowStockItems)}">
+                ⚠️ <b>CẢNH BÁO TỒN KHO THẤP</b>: Mặt hàng 
+                <span th:each="stock, iter : ${lowStockItems}">
+                    <span th:text="${'[' + stock.item.name + ']' + (iter.last ? '' : ', ')}">Thịt bò</span>
+                </span>
+                đang dưới ngưỡng an toàn! Vui lòng làm việc với bộ phận thu mua để bổ sung.
+            </div>
+
+            <!-- Tab Switcher -->
+            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                <button class="btn btn-secondary active-tab" id="tab-stock" onclick="switchInventoryTab('stock')">🪵 Tồn Kho Nguyên Liệu</button>
+                <button class="btn btn-secondary" id="tab-recipe" onclick="switchInventoryTab('recipe')">🍳 Định Lượng Công Thức (Đầu Bếp)</button>
+                <button class="btn btn-secondary" id="tab-menu" onclick="switchInventoryTab('menu')">🍽️ Quản Lý Thực Đơn (Món Ăn)</button>
+            </div>
+
+            <!-- Inventory table -->
+            <div id="stock-container" class="glass-panel">
+                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Tồn Kho Nguyên Liệu</h4>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>MÃ SKU</th>
+                                <th>TÊN NGUYÊN LIỆU</th>
+                                <th>ĐƠN VỊ TÍNH</th>
+                                <th>TỒN KHO THỰC TẾ</th>
+                                <th>NGƯỠNG TỐI THIỂU</th>
+                                <th>TRẠNG THÁI KHẢ DỤNG</th>
+                                <th>HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="stock : ${inventoryStocks}">
+                                <td th:text="${stock.item.sku}">MAT-001</td>
+                                <td th:text="${stock.item.name}">Bột mì</td>
+                                <td th:text="${stock.item.unit}">kg</td>
+                                <td style="font-weight: 700;" th:text="${stock.quantity}">50.0</td>
+                                <td th:text="${stock.reorderPoint}">10.0</td>
+                                <td>
+                                    <span th:class="${'status-badge ' + (stock.quantity > stock.reorderPoint ? 'badge-green' : 'badge-red')}" 
+                                          th:text="${stock.quantity > stock.reorderPoint ? 'Đủ Hàng' : 'Cần Nhập'}">
+                                        Đủ Hàng
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
+                                            th:data-id="${stock.item.id}"
+                                            th:data-name="${stock.item.name}"
+                                            th:data-qty="${stock.quantity}"
+                                            onclick="adjustStock(this.getAttribute('data-id'), this.getAttribute('data-name'), parseFloat(this.getAttribute('data-qty')))">
+                                        ⚙️ Kiểm Kê
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipes list (hidden by default) -->
+    <div id="recipe-container" class="glass-panel" style="display: none; margin: 0 32px 32px 32px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h4 style="font-size: 18px; font-weight: 600;">Định Lượng Nguyên Liệu Cho Từng Món Ăn</h4>
+            <button class="btn btn-primary" onclick="openRecipeModal()">
+                ➕ Cài Đặt Công Thức Món Ăn
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="premium-table">
+                <thead>
+                    <tr>
+                        <th>TÊN MÓN ĂN (BIẾN THỂ)</th>
+                        <th>SKU MÃ</th>
+                        <th>NGUYÊN LIỆU TIÊU HAO</th>
+                        <th style="text-align: right;">ĐỊNH LƯỢNG YÊU CẦU / 1 PHẦN AN</th>
+                        <th style="text-align: right;">HÀNH ĐỘNG</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="pStock : ${productStocks}">
+                        <td th:text="${pStock.variant.product.name + ' - ' + pStock.variant.name}" style="font-weight: 600;">Phở Bò - Size Vừa</td>
+                        <td th:text="${pStock.variant.sku}">PHOBOS</td>
+                        <td th:text="${pStock.item.name}">Thịt bò</td>
+                        <td style="text-align: right; font-weight: 700; color: var(--color-warning);" th:text="${pStock.quantityNeeded + ' ' + pStock.item.unit}">0.15 kg</td>
+                        <td style="text-align: right;">
+                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
+                                    th:data-id="${pStock.id}"
+                                    onclick="deleteRecipe(this.getAttribute('data-id'))">
+                                🗑️ Xóa
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recipe Setup Modal -->
+    <div class="modal-overlay" id="recipeModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Cài Đặt Định Lượng Công Thức</h3>
+                <button class="modal-close" onclick="closeRecipeModal()">×</button>
+            </div>
+            <form onsubmit="saveRecipe(event)">
+                <div class="form-group">
+                    <label>Chọn Món Ăn (Biến thể)</label>
+                    <select class="form-input" id="recipeVariantId" style="width: 100%;">
+                        <option th:each="var : ${variants}" th:value="${var.id}" th:text="${var.product.name + ' - ' + var.name + ' (' + var.sku + ')'}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Chọn Nguyên Liệu Trong Kho</label>
+                    <select class="form-input" id="recipeItemId" style="width: 100%;">
+                        <option th:each="item : ${inventoryItems}" th:value="${item.id}" th:text="${item.name + ' (' + item.unit + ')'}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Định lượng tiêu hao / 1 phần ăn</label>
+                    <input type="number" step="0.001" class="form-input" id="recipeQty" placeholder="Nhập lượng tiêu hao (vd: 0.15)..." required style="width: 100%;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+                    Lưu công thức định lượng
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Menu CRUD Panel (hidden by default) -->
+    <div id="menu-container" class="glass-panel" style="display: none; margin: 0 32px 32px 32px;">
+        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+            <!-- Category CRUD Panel (left/small) -->
+            <div style="flex: 1; min-width: 300px;" class="glass-panel">
+                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">📁 Quản Lý Danh Mục</h4>
+                <form onsubmit="saveCategory(event)" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                    <input type="text" id="catName" class="form-input" placeholder="Tên danh mục mới..." required style="flex: 1;">
+                    <button type="submit" class="btn btn-primary" style="padding: 0 12px;">Thêm</button>
+                </form>
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>DANH MỤC</th>
+                                <th style="text-align: right;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="cat : ${categories}">
+                                <td th:text="${cat.name}" style="font-weight: 600;">Món chính</td>
+                                <td style="text-align: right;">
+                                    <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" 
+                                            th:data-id="${cat.id}"
+                                            onclick="deleteCategory(this.getAttribute('data-id'))">
+                                        🗑️ Xóa
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Dish CRUD Panel (right/large) -->
+            <div style="flex: 3; min-width: 600px;" class="glass-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h4 style="font-size: 18px; font-weight: 600;">🍽️ Danh Sách Món Ăn & Biến Thể</h4>
+                    <button class="btn btn-primary" onclick="openMenuModal()">
+                        ➕ Thêm Món Ăn Mới
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>TÊN MÓN ĂN (BIẾN THỂ)</th>
+                                <th>DANH MỤC</th>
+                                <th>MÃ SKU</th>
+                                <th style="text-align: right;">GIÁ BÁN</th>
+                                <th style="text-align: right;">GIÁ VỐN</th>
+                                <th>TRẠNG THÁI</th>
+                                <th style="text-align: right;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="var : ${variants}">
+                                <td th:text="${var.product.name + ' - ' + var.name}" style="font-weight: 600;">Phở Bò - Size Vừa</td>
+                                <td th:text="${var.product.category != null ? var.product.category.name : 'Chưa phân loại'}">Món chính</td>
+                                <td th:text="${var.sku}" style="font-family: monospace;">PHOBOS</td>
+                                <td style="text-align: right; font-weight: 700; color: var(--color-green);" th:text="${#numbers.formatDecimal(var.price, 0, 'COMMA', 0, 'POINT') + 'đ'}">45,000đ</td>
+                                <td style="text-align: right; color: var(--text-muted);" th:text="${#numbers.formatDecimal(var.originalPrice, 0, 'COMMA', 0, 'POINT') + 'đ'}">25,000đ</td>
+                                <td>
+                                    <span th:class="${'status-badge ' + (var.product.isActive ? 'badge-green' : 'badge-red')}"
+                                          th:text="${var.product.isActive ? 'Đang Bán' : 'Ngừng Bán'}">
+                                        Đang Bán
+                                    </span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                th:data-id="${var.id}"
+                                                th:data-prodname="${var.product.name}"
+                                                th:data-catid="${var.product.category != null ? var.product.category.id : ''}"
+                                                th:data-desc="${var.product.description}"
+                                                th:data-img="${var.product.imagePath}"
+                                                th:data-active="${var.product.isActive}"
+                                                th:data-varname="${var.name}"
+                                                th:data-price="${var.price}"
+                                                th:data-origprice="${var.originalPrice}"
+                                                th:data-sku="${var.sku}"
+                                                onclick="editMenu(this)">
+                                            ✏️ Sửa
+                                        </button>
+                                        <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;"
+                                                th:data-id="${var.id}"
+                                                onclick="deleteMenu(this.getAttribute('data-id'))">
+                                            🗑️ Xóa
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu CRUD Modal -->
+    <div class="modal-overlay" id="menuModal">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="menuModalTitle">Thêm Món Ăn Mới</h3>
+                <button class="modal-close" onclick="closeMenuModal()">×</button>
+            </div>
+            <form onsubmit="saveMenu(event)">
+                <input type="hidden" id="menuVarId">
+                <div class="form-group">
+                    <label>Tên Món Ăn (Ví dụ: Phở Bò)</label>
+                    <input type="text" class="form-input" id="menuProductName" required style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label>Danh Mục Món Ăn</label>
+                    <select class="form-input" id="menuCategoryId" style="width: 100%;">
+                        <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mô tả món ăn</label>
+                    <textarea class="form-input" id="menuDescription" rows="2" style="width: 100%; height: auto;"></textarea>
+                </div>
+                <div class="form-group" style="display: none;">
+                    <label>Ảnh món ăn (Tên file)</label>
+                    <input type="text" class="form-input" id="menuImagePath" placeholder="default.png" style="width: 100%;">
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Tên biến thể (vd: Size Vừa)</label>
+                        <input type="text" class="form-input" id="menuVariantName" placeholder="Món lẻ / Size Vừa..." required style="width: 100%;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Mã SKU (Duy nhất)</label>
+                        <input type="text" class="form-input" id="menuSku" placeholder="PHOBOS..." required style="width: 100%;">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Giá bán (VND)</label>
+                        <input type="number" step="1" class="form-input" id="menuPrice" required style="width: 100%;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Giá vốn (VND)</label>
+                        <input type="number" step="1" class="form-input" id="menuOriginalPrice" required style="width: 100%;">
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="menuActive" checked style="width: auto;">
+                    <label for="menuActive" style="margin-bottom: 0;">Trạng thái kinh doanh (Đang Bán)</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+                    Lưu món ăn thực đơn
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function adjustStock(itemId, itemName, currentQty) {
+            let actual = prompt("Nhập số lượng thực tế kiểm đếm được cho [" + itemName + "]:", currentQty);
+            if (actual === null) return;
+            
+            let actualNum = parseFloat(actual);
+            if (isNaN(actualNum) || actualNum < 0) {
+                showToast("Số lượng nhập vào không hợp lệ!", "error");
+                return;
+            }
+
+            fetch('/api/inventory/adjust', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    itemId: parseInt(itemId),
+                    actualQuantity: actualNum
+                })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã cập nhật chênh lệch kiểm kê kho thành công.", "success");
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi kiểm kê kho: " + text, "warning");
+                }
+            })
+            .catch(error => {
+                showToast("Lỗi hệ thống: " + error, "error");
+            });
+        }
+
+        function switchInventoryTab(tabType) {
+            document.getElementById('tab-stock').classList.remove('active-tab');
+            document.getElementById('tab-recipe').classList.remove('active-tab');
+            document.getElementById('tab-menu').classList.remove('active-tab');
+            
+            document.getElementById('tab-' + tabType).classList.add('active-tab');
+            
+            document.getElementById('stock-container').style.display = 'none';
+            document.getElementById('recipe-container').style.display = 'none';
+            document.getElementById('menu-container').style.display = 'none';
+            
+            if (tabType === 'stock') {
+                document.getElementById('stock-container').style.display = 'block';
+            } else if (tabType === 'recipe') {
+                document.getElementById('recipe-container').style.display = 'block';
+            } else if (tabType === 'menu') {
+                document.getElementById('menu-container').style.display = 'block';
+            }
+        }
+        
+        function openRecipeModal() {
+            document.getElementById('recipeQty').value = '';
+            document.getElementById('recipeModal').classList.add('active');
+        }
+        
+        function closeRecipeModal() {
+            document.getElementById('recipeModal').classList.remove('active');
+        }
+        
+        function saveRecipe(e) {
+            e.preventDefault();
+            let variantId = parseInt(document.getElementById('recipeVariantId').value);
+            let itemId = parseInt(document.getElementById('recipeItemId').value);
+            let qty = parseFloat(document.getElementById('recipeQty').value);
+            
+            fetch('/api/inventory/recipes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    variantId: variantId,
+                    itemId: itemId,
+                    quantityNeeded: qty
+                })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã lưu định lượng công thức món ăn thành công.", "success");
+                    closeRecipeModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi cấu hình công thức: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+        
+        function deleteRecipe(id) {
+            if (!confirm("Bạn có chắc chắn muốn xóa định lượng nguyên liệu này của món ăn?")) return;
+            
+            fetch('/api/inventory/recipes/' + id, {
+                method: 'DELETE'
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã xóa định lượng nguyên liệu thành công.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi xóa định lượng: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        // Category & Menu CRUD AJAX Actions
+        function saveCategory(e) {
+            e.preventDefault();
+            let name = document.getElementById('catName').value.trim();
+            fetch('/api/inventory/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã thêm danh mục thành công.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi thêm danh mục: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        function deleteCategory(id) {
+            if (!confirm("Bạn có chắc chắn muốn xóa danh mục này? Tất cả các món ăn thuộc danh mục này phải được xóa hoặc chuyển đi trước.")) return;
+            fetch('/api/inventory/categories/' + id, {
+                method: 'DELETE'
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã xóa danh mục thành công.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast(text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        function openMenuModal() {
+            document.getElementById('menuVarId').value = '';
+            document.getElementById('menuProductName').value = '';
+            document.getElementById('menuDescription').value = '';
+            document.getElementById('menuImagePath').value = '';
+            document.getElementById('menuVariantName').value = 'Món lẻ';
+            document.getElementById('menuSku').value = '';
+            document.getElementById('menuPrice').value = '';
+            document.getElementById('menuOriginalPrice').value = '';
+            document.getElementById('menuActive').checked = true;
+            
+            document.getElementById('menuModalTitle').innerText = 'Thêm Món Ăn Mới';
+            document.getElementById('menuSku').disabled = false;
+            document.getElementById('menuModal').classList.add('active');
+        }
+
+        function closeMenuModal() {
+            document.getElementById('menuModal').classList.remove('active');
+        }
+
+        function editMenu(btn) {
+            document.getElementById('menuVarId').value = btn.getAttribute('data-id');
+            document.getElementById('menuProductName').value = btn.getAttribute('data-prodname');
+            document.getElementById('menuCategoryId').value = btn.getAttribute('data-catid');
+            document.getElementById('menuDescription').value = btn.getAttribute('data-desc');
+            document.getElementById('menuImagePath').value = btn.getAttribute('data-img');
+            document.getElementById('menuVariantName').value = btn.getAttribute('data-varname');
+            document.getElementById('menuSku').value = btn.getAttribute('data-sku');
+            document.getElementById('menuPrice').value = btn.getAttribute('data-price');
+            document.getElementById('menuOriginalPrice').value = btn.getAttribute('data-origprice');
+            document.getElementById('menuActive').checked = (btn.getAttribute('data-active') === 'true');
+            
+            document.getElementById('menuModalTitle').innerText = 'Chỉnh Sửa Món Ăn';
+            document.getElementById('menuSku').disabled = false; // Allow SKU correction
+            document.getElementById('menuModal').classList.add('active');
+        }
+
+        function saveMenu(e) {
+            e.preventDefault();
+            let varId = document.getElementById('menuVarId').value;
+            let prodName = document.getElementById('menuProductName').value.trim();
+            let catId = parseInt(document.getElementById('menuCategoryId').value);
+            let desc = document.getElementById('menuDescription').value.trim();
+            let img = document.getElementById('menuImagePath').value.trim();
+            let varName = document.getElementById('menuVariantName').value.trim();
+            let sku = document.getElementById('menuSku').value.trim();
+            let price = parseFloat(document.getElementById('menuPrice').value);
+            let origPrice = parseFloat(document.getElementById('menuOriginalPrice').value);
+            let active = document.getElementById('menuActive').checked;
+
+            fetch('/api/inventory/menu', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: varId ? parseInt(varId) : null,
+                    productName: prodName,
+                    categoryId: catId,
+                    description: desc,
+                    imagePath: img,
+                    active: active,
+                    variantName: varName,
+                    price: price,
+                    originalPrice: origPrice,
+                    sku: sku
+                })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã lưu món ăn thành công.", "success");
+                    closeMenuModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi lưu món ăn: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        function deleteMenu(id) {
+            if (!confirm("Bạn có chắc chắn muốn xóa món ăn / biến thể này khỏi thực đơn?")) return;
+            fetch('/api/inventory/menu/' + id, {
+                method: 'DELETE'
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã xóa món ăn khỏi thực đơn.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi xóa món ăn: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+    </script>
+</body>
+</html>

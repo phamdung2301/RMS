@@ -1,0 +1,391 @@
+package web.restaurant.swp.modules.hr.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import web.restaurant.swp.modules.auth.model.*;
+import web.restaurant.swp.modules.auth.repository.*;
+import web.restaurant.swp.modules.auth.service.*;
+import web.restaurant.swp.modules.pos.model.*;
+import web.restaurant.swp.modules.pos.repository.*;
+import web.restaurant.swp.modules.pos.service.*;
+import web.restaurant.swp.modules.inventory.model.*;
+import web.restaurant.swp.modules.inventory.repository.*;
+import web.restaurant.swp.modules.inventory.service.*;
+import web.restaurant.swp.modules.procurement.model.*;
+import web.restaurant.swp.modules.procurement.repository.*;
+import web.restaurant.swp.modules.procurement.service.*;
+import web.restaurant.swp.modules.hr.model.*;
+import web.restaurant.swp.modules.hr.repository.*;
+import web.restaurant.swp.modules.hr.service.*;
+import web.restaurant.swp.modules.loyalty.model.*;
+import web.restaurant.swp.modules.loyalty.repository.*;
+import web.restaurant.swp.modules.loyalty.service.*;
+import web.restaurant.swp.modules.promotion.model.*;
+import web.restaurant.swp.modules.promotion.repository.*;
+import web.restaurant.swp.modules.promotion.service.*;
+import web.restaurant.swp.modules.analytics.service.*;
+import web.restaurant.swp.modules.branch.model.*;
+import web.restaurant.swp.modules.branch.repository.*;
+
+import org.springframework.web.bind.annotation.RequestBody;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.List;
+import java.util.Optional;
+
+@Controller
+@RequiredArgsConstructor
+public class HRController {
+
+    private final EmployeeRepository employeeRepository;
+    private final EmployeeShiftAssignmentRepository employeeShiftAssignmentRepository;
+    private final EmployeeAttendanceRepository employeeAttendanceRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
+    private final ForgotClockRequestRepository forgotClockRequestRepository;
+    private final ShiftTemplateRepository shiftTemplateRepository;
+    private final UserRepository userRepository;
+    private final HRService hrService;
+
+    private User getLoggedInUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return null;
+        return userRepository.findByEmail(auth.getName()).orElse(null);
+    }
+
+    private String getActiveBranchId() {
+        User user = getLoggedInUser();
+        if (user != null && user.getBranch() != null) {
+            return user.getBranch().getBranchId();
+        }
+        return "branch-1";
+    }
+
+    @GetMapping("/schedule")
+    public String schedule(Model model) {
+        String branchId = getActiveBranchId();
+        model.addAttribute("employees", employeeRepository.findByBranchBranchId(branchId));
+        
+        LocalDate startOfWeek = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
+        model.addAttribute("startOfWeek", startOfWeek);
+        
+        List<LocalDate> weekDates = IntStream.range(0, 7)
+                .mapToObj(startOfWeek::plusDays)
+                .collect(Collectors.toList());
+        model.addAttribute("weekDates", weekDates);
+
+        List<EmployeeShiftAssignment> assignments = employeeShiftAssignmentRepository
+                .findByEmployeeBranchBranchIdAndDateBetween(branchId, startOfWeek, startOfWeek.plusDays(6));
+        model.addAttribute("assignments", assignments);
+
+        model.addAttribute("shiftTemplates", shiftTemplateRepository.findAll());
+
+        return "schedule";
+    }
+
+    @PostMapping("/api/hr/schedule/assign")
+    @ResponseBody
+    public ResponseEntity<?> assignShift(@RequestBody ShiftAssignmentRequest request) {
+        try {
+            EmployeeShiftAssignment assignment = hrService.assignShift(
+                request.getEmployeeId(), 
+                request.getShiftTemplateId(), 
+                request.getDate()
+            );
+            return ResponseEntity.ok(assignment);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/schedule/assign-bulk")
+    @ResponseBody
+    public ResponseEntity<?> assignShiftBulk(@RequestBody BulkShiftAssignmentRequest request) {
+        try {
+            hrService.assignShiftBulk(
+                request.getEmployeeIds(),
+                request.getShiftTemplateId(),
+                request.getDate()
+            );
+            return ResponseEntity.ok("Xếp ca hàng loạt thành công!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/hr/schedule/range")
+    @ResponseBody
+    public ResponseEntity<?> getScheduleRange(@RequestParam String start, @RequestParam String end) {
+        try {
+            LocalDate startDate = LocalDate.parse(start);
+            LocalDate endDate = LocalDate.parse(end);
+            String branchId = getActiveBranchId();
+            List<EmployeeShiftAssignment> assignments = employeeShiftAssignmentRepository
+                    .findByEmployeeBranchBranchIdAndDateBetween(branchId, startDate, endDate);
+            
+            List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+            for (EmployeeShiftAssignment assignment : assignments) {
+                java.util.Map<String, Object> map = new java.util.HashMap<>();
+                map.put("id", assignment.getId());
+                map.put("employeeId", assignment.getEmployee().getId());
+                map.put("employeeName", assignment.getEmployee().getUser().getName());
+                map.put("employeeTitle", assignment.getEmployee().getTitle());
+                map.put("shiftTemplateId", assignment.getShiftTemplate().getId());
+                map.put("shiftTemplateName", assignment.getShiftTemplate().getName());
+                map.put("startTime", assignment.getShiftTemplate().getStartTime());
+                map.put("endTime", assignment.getShiftTemplate().getEndTime());
+                map.put("date", assignment.getDate().toString());
+                result.add(map);
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/hr/schedule/my-schedule")
+    @ResponseBody
+    public ResponseEntity<?> getMySchedule(@RequestParam String month) {
+        try {
+            User user = getLoggedInUser();
+            if (user == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập.");
+            }
+            Optional<Employee> empOpt = employeeRepository.findByUserId(user.getId());
+            if (empOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body("Tài khoản không được liên kết với hồ sơ nhân sự.");
+            }
+            Employee employee = empOpt.get();
+            
+            String[] parts = month.split("-");
+            int year = Integer.parseInt(parts[0]);
+            int mVal = Integer.parseInt(parts[1]);
+            LocalDate startDate = LocalDate.of(year, mVal, 1);
+            LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+            
+            List<EmployeeShiftAssignment> assignments = employeeShiftAssignmentRepository
+                    .findByEmployeeIdAndDateBetween(employee.getId(), startDate, endDate);
+            
+            List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+            for (EmployeeShiftAssignment assignment : assignments) {
+                java.util.Map<String, Object> map = new java.util.HashMap<>();
+                map.put("id", assignment.getId());
+                map.put("shiftTemplateId", assignment.getShiftTemplate().getId());
+                map.put("shiftTemplateName", assignment.getShiftTemplate().getName());
+                map.put("startTime", assignment.getShiftTemplate().getStartTime());
+                map.put("endTime", assignment.getShiftTemplate().getEndTime());
+                map.put("date", assignment.getDate().toString());
+                result.add(map);
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @lombok.Data
+    public static class ShiftAssignmentRequest {
+        private Long employeeId;
+        private Long shiftTemplateId;
+        private LocalDate date;
+    }
+
+    @lombok.Data
+    public static class BulkShiftAssignmentRequest {
+        private List<Long> employeeIds;
+        private Long shiftTemplateId;
+        private LocalDate date;
+    }
+
+    @GetMapping("/employees")
+    public String employees(Model model) {
+        User user = getLoggedInUser();
+        if (user != null) {
+            Optional<Employee> empOpt = employeeRepository.findByUserId(user.getId());
+            if (empOpt.isPresent()) {
+                Employee employee = empOpt.get();
+                model.addAttribute("employee", employee);
+                
+                LocalDate today = LocalDate.now();
+                LocalDate yesterday = today.minusDays(1);
+                
+                // Get assignments for yesterday and today to check active shift
+                List<EmployeeShiftAssignment> assignments = new java.util.ArrayList<>();
+                assignments.addAll(employeeShiftAssignmentRepository.findByEmployeeIdAndDate(employee.getId(), yesterday));
+                assignments.addAll(employeeShiftAssignmentRepository.findByEmployeeIdAndDate(employee.getId(), today));
+                
+                List<EmployeeAttendance> todayAtts = employeeAttendanceRepository.findAllByEmployeeIdAndDate(employee.getId(), today);
+                
+                // Find active open attendance across database to keep user clocked in correctly
+                Optional<EmployeeAttendance> activeAtt = employeeAttendanceRepository.findFirstByEmployeeIdAndClockOutIsNull(employee.getId());
+                
+                boolean canClockIn = false;
+                boolean canClockOut = false;
+                EmployeeAttendance currentAttendance = null;
+                
+                if (activeAtt.isPresent()) {
+                    canClockIn = false;
+                    canClockOut = true;
+                    currentAttendance = activeAtt.get();
+                } else {
+                    canClockOut = false;
+                    
+                    // Check if there is a pending shift currently in progress
+                    LocalDateTime now = LocalDateTime.now();
+                    boolean hasPendingShift = false;
+                    for (EmployeeShiftAssignment assignment : assignments) {
+                        Optional<EmployeeAttendance> existingAtt = employeeAttendanceRepository.findByShiftAssignmentId(assignment.getId());
+                        if (existingAtt.isEmpty()) {
+                            LocalTime startLocal = LocalTime.parse(assignment.getShiftTemplate().getStartTime());
+                            LocalTime endLocal = LocalTime.parse(assignment.getShiftTemplate().getEndTime());
+                            
+                            LocalDateTime startDateTime = LocalDateTime.of(assignment.getDate(), startLocal);
+                            LocalDateTime endDateTime = endLocal.isBefore(startLocal)
+                                    ? LocalDateTime.of(assignment.getDate().plusDays(1), endLocal)
+                                    : LocalDateTime.of(assignment.getDate(), endLocal);
+                            
+                            if (now.isAfter(startDateTime.minusHours(2)) && now.isBefore(endDateTime.plusHours(2))) {
+                                hasPendingShift = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (hasPendingShift) {
+                        canClockIn = true;
+                    } else {
+                        // Free check-in if there is no attendance completed today
+                        long completedToday = todayAtts.stream().filter(a -> a.getClockOut() != null).count();
+                        canClockIn = completedToday == 0;
+                        
+                        // Prevent extra check-in if all scheduled assignments are already completed
+                        if (!assignments.isEmpty()) {
+                            long completedAssignments = todayAtts.stream()
+                                    .filter(a -> a.getShiftAssignment() != null && a.getClockOut() != null)
+                                    .count();
+                            if (completedAssignments >= assignments.size()) {
+                                canClockIn = false;
+                            }
+                        }
+                    }
+                    currentAttendance = todayAtts.isEmpty() ? null : todayAtts.get(todayAtts.size() - 1);
+                }
+                
+                model.addAttribute("attendance", currentAttendance);
+                model.addAttribute("canClockIn", canClockIn);
+                model.addAttribute("canClockOut", canClockOut);
+                
+                model.addAttribute("leaveRequests", leaveRequestRepository.findByEmployeeId(employee.getId()));
+                model.addAttribute("forgotRequests", forgotClockRequestRepository.findByEmployeeId(employee.getId()));
+            } else {
+                model.addAttribute("noEmployeeProfile", true);
+            }
+        }
+        return "employees";
+    }
+
+    @PostMapping("/api/employee/clock-in")
+    @ResponseBody
+    public ResponseEntity<?> clockInUser() {
+        try {
+            User user = getLoggedInUser();
+            Optional<Employee> empOpt = employeeRepository.findByUserId(user.getId());
+            if (empOpt.isPresent()) {
+                EmployeeAttendance att = hrService.clockIn(empOpt.get().getId());
+                return ResponseEntity.ok(att);
+            }
+            return ResponseEntity.badRequest().body("No Employee Profile mapped");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/employee/clock-out")
+    @ResponseBody
+    public ResponseEntity<?> clockOutUser() {
+        try {
+            User user = getLoggedInUser();
+            Optional<Employee> empOpt = employeeRepository.findByUserId(user.getId());
+            if (empOpt.isPresent()) {
+                EmployeeAttendance att = hrService.clockOut(empOpt.get().getId());
+                return ResponseEntity.ok(att);
+            }
+            return ResponseEntity.badRequest().body("No Employee Profile mapped");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/hr/shifts")
+    @ResponseBody
+    public ResponseEntity<?> getShiftTemplates() {
+        return ResponseEntity.ok(shiftTemplateRepository.findAll());
+    }
+
+    @PostMapping("/api/hr/shifts/save")
+    @ResponseBody
+    public ResponseEntity<?> saveShiftTemplate(@RequestBody ShiftTemplateRequest request) {
+        try {
+            ShiftTemplate template;
+            if (request.getId() != null) {
+                template = shiftTemplateRepository.findById(request.getId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy ca làm việc."));
+                template.setName(request.getName());
+                template.setStartTime(request.getStartTime());
+                template.setEndTime(request.getEndTime());
+                template.setDurationHours(request.getDurationHours());
+            } else {
+                template = ShiftTemplate.builder()
+                        .name(request.getName())
+                        .startTime(request.getStartTime())
+                        .endTime(request.getEndTime())
+                        .durationHours(request.getDurationHours())
+                        .build();
+            }
+            return ResponseEntity.ok(shiftTemplateRepository.save(template));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/api/hr/shifts/{id}")
+    @ResponseBody
+    public ResponseEntity<?> deleteShiftTemplate(@PathVariable Long id) {
+        try {
+            // Check if there are assignments using this template
+            long count = employeeShiftAssignmentRepository.findAll().stream()
+                    .filter(a -> a.getShiftTemplate().getId().equals(id))
+                    .count();
+            if (count > 0) {
+                return ResponseEntity.badRequest().body("Ca làm việc này đang được sử dụng để phân lịch, không thể xóa!");
+            }
+            shiftTemplateRepository.deleteById(id);
+            return ResponseEntity.ok("Xóa ca làm việc thành công!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @lombok.Data
+    public static class ShiftTemplateRequest {
+        private Long id;
+        private String name;
+        private String startTime;
+        private String endTime;
+        private Double durationHours;
+    }
+}

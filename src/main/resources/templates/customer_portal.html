@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteFlow Customer CRM Portal</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        body {
+            background-color: #080c14;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .portal-card {
+            width: 100%;
+            max-width: 460px;
+            padding: 32px;
+        }
+        .tier-header {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 12px;
+            padding: 24px;
+            color: #1e1b4b;
+            text-align: center;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
+        .tier-silver {
+            background: linear-gradient(135deg, #e5e7eb, #9ca3af);
+            box-shadow: 0 4px 15px rgba(156, 163, 175, 0.3);
+        }
+        .tier-platinum {
+            background: linear-gradient(135deg, #818cf8, #6366f1);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+        .points-box {
+            font-size: 40px;
+            font-weight: 800;
+            margin-top: 12px;
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="portal-card glass-panel">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div class="brand-icon" style="margin: 0 auto 12px auto;">LF</div>
+            <h2 style="font-size: 22px; font-weight: 700;">LiteFlow Customer Portal</h2>
+            <p style="color: var(--text-muted); font-size: 13px;">Tra cứu cá nhân và thông tin tích điểm hóa đơn</p>
+        </div>
+
+        <!-- Tier Banner -->
+        <div th:class="${'tier-header ' + (customer.membershipTier == 'Silver' ? 'tier-silver' : (customer.membershipTier == 'Platinum' ? 'tier-platinum' : ''))}">
+            <span style="font-weight: 700; font-size: 14px; text-transform: uppercase;" th:text="${customer.membershipTier + ' Member'}">GOLD MEMBER</span>
+            <div class="points-box" th:text="${customer.loyaltyPoints + ' pts'}">
+                1,250 pts
+            </div>
+            <p style="font-size: 13px; opacity: 0.9; margin-top: 8px;" th:text="${'Tài khoản: ' + customer.name}">Khách hàng: Nguyễn Hoàng Nam</p>
+        </div>
+
+        <!-- Spend Progress -->
+        <div style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+                <span>Tổng chi tiêu tích luỹ:</span>
+                <span style="color: white; font-weight: 600;" th:text="${'₫' + #numbers.formatDecimal(customer.totalSpent, 0, 'COMMA', 0, 'POINT')}">₫12,500,000</span>
+            </div>
+            <!-- Progress bar -->
+            <div style="height: 8px; background: rgba(255,255,255,0.06); border-radius: 9999px; overflow: hidden;">
+                <div style="height: 100%; background: var(--color-primary);" th:style="${'width: ' + (customer.totalSpent >= 20000000.0 ? '100' : (customer.totalSpent / 200000.0)) + '%'}"></div>
+            </div>
+        </div>
+
+        <!-- Transaction history -->
+        <div>
+            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                Lịch Sử Tích & Tiêu Điểm
+            </h3>
+            <div th:each="tx : ${transactions}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                <div>
+                    <span style="font-size: 14px; font-weight: 500;" th:text="${tx.type == 'Earn' ? 'Tích lũy từ hóa đơn' : 'Quy đổi thanh toán'}">Tích lũy từ hóa đơn</span><br>
+                    <span style="font-size: 12px; color: var(--text-muted);" th:text="${#temporals.format(tx.transactionDate, 'dd/MM/yyyy HH:mm')}">29/05/2026 12:30</span>
+                </div>
+                <span th:class="${tx.points > 0 ? 'text-price' : ''}" style="font-weight: 700;" th:text="${(tx.points > 0 ? '+' : '') + tx.points + ' pts'}">
+                    +120 pts
+                </span>
+            </div>
+            <div th:if="${#lists.isEmpty(transactions)}" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px;">
+                Chưa có giao dịch tích lũy điểm nào.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

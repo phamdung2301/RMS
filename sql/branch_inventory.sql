@@ -1,0 +1,23 @@
+-- Branch Inventory SQL data
+INSERT INTO branch_inventory (id, branch_id, item_id, quantity, reorder_point) VALUES
+(1, 'branch-2', 1, 20.0, 10.0),
+(2, 'branch-3', 2, 40.0, 10.0),
+(3, 'branch-1', 3, 60.0, 10.0),
+(4, 'branch-2', 4, 80.0, 10.0),
+(5, 'branch-3', 5, 100.0, 10.0),
+(6, 'branch-1', 6, 120.0, 10.0),
+(7, 'branch-2', 7, 140.0, 10.0),
+(8, 'branch-3', 8, 160.0, 10.0),
+(9, 'branch-1', 9, 180.0, 10.0),
+(10, 'branch-2', 10, 200.0, 10.0),
+(11, 'branch-3', 11, 220.0, 10.0),
+(12, 'branch-1', 12, 240.0, 10.0),
+(13, 'branch-2', 13, 260.0, 10.0),
+(14, 'branch-3', 14, 280.0, 10.0),
+(15, 'branch-1', 15, 300.0, 10.0),
+(16, 'branch-2', 16, 320.0, 10.0),
+(17, 'branch-3', 17, 340.0, 10.0),
+(18, 'branch-1', 18, 360.0, 10.0),
+(19, 'branch-2', 19, 380.0, 10.0),
+(20, 'branch-3', 20, 400.0, 10.0)
+ON CONFLICT (id) DO NOTHING;

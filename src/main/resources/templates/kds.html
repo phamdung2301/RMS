@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Kitchen Display System (KDS)</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .kds-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .kds-column {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .col-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 700;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 4px;
+        }
+        .col-pending { border-top: 4px solid var(--text-muted); }
+        .col-cooking { border-top: 4px solid var(--color-warning); }
+        .col-ready { border-top: 4px solid var(--color-success); }
+        
+        .kds-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+        .kds-card.delayed {
+            border-color: var(--color-danger);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.05);
+        }
+        .kds-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 8px;
+        }
+        .table-name {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .dish-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .dish-meta {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .qty-badge {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--color-success);
+        }
+        .card-timer {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .btn-kds {
+            padding: 6px;
+            font-size: 12px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            font-weight: 600;
+        }
+        .btn-kds-active {
+            background: var(--color-primary);
+            color: white;
+        }
+        .btn-kds-inactive {
+            background: rgba(255,255,255,0.06);
+            color: var(--text-muted);
+        }
+        .kds-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Mobile KDS adjustments */
+        @media (max-width: 1024px) {
+            .kds-container {
+                grid-template-columns: 1fr 1fr;
+                height: auto;
+                overflow: visible;
+            }
+        }
+        @media (max-width: 768px) {
+            .kds-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow: visible;
+            }
+            .kds-top-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="kds-top-bar">
+                <div>
+                    <h2 style="font-size: 26px; font-weight: 700;">Kitchen Display System</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Màn hình giám sát và điều phối chế biến</p>
+                </div>
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <span style="font-size: 14px; color: var(--text-muted);">
+                        Tổng đơn chế biến: <b style="color: white; font-size: 16px;" id="total-kds-count">3</b>
+                    </span>
+                    <a th:href="@{/pos}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">💻 Màn Hình POS</a>
+                </div>
+            </div>
+
+            <!-- Kanban Columns -->
+            <div class="kds-container">
+                <!-- Column 1: Chờ Nấu (Pending / Sent) -->
+                <div class="kds-column col-pending">
+                    <div class="col-title">
+                        <span>Chờ Nấu</span>
+                        <span class="status-badge" style="background: rgba(255,255,255,0.08);" id="cnt-pending">2</span>
+                    </div>
+                    <!-- Cards -->
+                    <div th:each="d : ${orderDetails}" th:if="${d.status == 'SENT'}" 
+                         class="kds-card" th:id="${'kds-card-' + d.id}" th:attr="data-time=${d.order.orderDate}">
+                        <div class="kds-card-header">
+                            <span class="table-name" th:text="${d.order.session.table.name}">Bàn 2</span>
+                            <span class="qty-badge" th:text="${'Số lượng: ' + d.quantity}">Số lượng: 2</span>
+                        </div>
+                        <div>
+                            <div class="dish-name" th:text="${d.variant.product.name}">Phở Bò</div>
+                            <div class="dish-meta" th:text="${'Size: ' + d.variant.name}">Size: Vừa</div>
+                            <div class="dish-meta" style="color: var(--color-warning); font-style: italic;" th:text="${'Ghi chú: ' + d.notes}">Không hành</div>
+                        </div>
+                        <div class="card-timer">
+                            ⏱️ <span class="timer-display" th:text="${d.order.orderDate}">00:00</span>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn-kds btn-kds-active">Chờ</button>
+                            <button class="btn-kds btn-kds-inactive" th:onclick="'updateStatus(' + ${d.id} + ', \'COOKING\')'">Nấu</button>
+                            <button class="btn-kds btn-kds-inactive" th:onclick="'updateStatus(' + ${d.id} + ', \'READY\')'">Xong</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 2: Đang Nấu (Cooking) -->
+                <div class="kds-column col-cooking">
+                    <div class="col-title">
+                        <span>Đang Nấu</span>
+                        <span class="status-badge badge-orange" id="cnt-cooking">1</span>
+                    </div>
+                    <!-- Cards -->
+                    <div th:each="d : ${orderDetails}" th:if="${d.status == 'COOKING'}" 
+                         class="kds-card" th:id="${'kds-card-' + d.id}" th:attr="data-time=${d.order.orderDate}">
+                        <div class="kds-card-header">
+                            <span class="table-name" th:text="${d.order.session.table.name}">Bàn 5</span>
+                            <span class="qty-badge" th:text="${'Số lượng: ' + d.quantity}">Số lượng: 3</span>
+                        </div>
+                        <div>
+                            <div class="dish-name" th:text="${d.variant.product.name}">Gỏi Cuốn Tôm</div>
+                            <div class="dish-meta" th:text="${'Size: ' + d.variant.name}">Size: Lớn</div>
+                            <div class="dish-meta" style="color: var(--color-warning); font-style: italic;" th:text="${'Ghi chú: ' + d.notes}">Nhiều tương</div>
+                        </div>
+                        <div class="card-timer">
+                            ⏱️ <span class="timer-display" th:text="${d.order.orderDate}">00:00</span>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn-kds btn-kds-inactive" th:onclick="'updateStatus(' + ${d.id} + ', \'SENT\')'">Chờ</button>
+                            <button class="btn-kds btn-kds-active">Nấu</button>
+                            <button class="btn-kds btn-kds-inactive" th:onclick="'updateStatus(' + ${d.id} + ', \'READY\')'">Xong</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 3: Sẵn Sàng (Ready / Served) -->
+                <div class="kds-column col-ready">
+                    <div class="col-title">
+                        <span>Sẵn Sàng</span>
+                        <span class="status-badge badge-green" id="cnt-ready">1</span>
+                    </div>
+                    <!-- Cards -->
+                    <div th:each="d : ${orderDetails}" th:if="${d.status == 'READY'}" 
+                         class="kds-card" th:id="${'kds-card-' + d.id}" th:attr="data-time=${d.order.orderDate}">
+                        <div class="kds-card-header">
+                            <span class="table-name" th:text="${d.order.session.table.name}">Bàn VIP 1</span>
+                            <span class="qty-badge" th:text="${'Số lượng: ' + d.quantity}">Số lượng: 4</span>
+                        </div>
+                        <div>
+                            <div class="dish-name" th:text="${d.variant.product.name}">Cà Phê Đen</div>
+                            <div class="dish-meta" th:text="${'Size: ' + d.variant.name}">Nóng</div>
+                            <div class="dish-meta" style="color: var(--color-warning); font-style: italic;" th:text="${'Ghi chú: ' + d.notes}">Không đường</div>
+                        </div>
+                        <div class="card-timer">
+                            ⏱️ <span class="timer-display" th:text="${d.order.orderDate}">00:00</span>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn-kds btn-kds-inactive" th:onclick="'updateStatus(' + ${d.id} + ', \'COOKING\')'">Nấu</button>
+                            <button class="btn-kds btn-kds-active">Xong</button>
+                            <button class="btn-kds btn-primary" style="padding:4px;" th:onclick="'updateStatus(' + ${d.id} + ', \'SERVED\')'">Bưng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        // WebSocket Listener to auto reload on updates
+        let wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        let socket = new WebSocket(wsProtocol + window.location.host + '/ws/kds');
+        socket.onmessage = function(event) {
+            if (event.data === "NEW_ORDER_SUBMITTED" || event.data === "ORDER_STATE_CHANGED") {
+                window.location.reload();
+            }
+        };
+
+        function updateStatus(detailId, newStatus) {
+            fetch(`/api/kds/status?detailId=${detailId}&status=${newStatus}`, { method: 'POST' })
+                .then(() => {
+                    window.location.reload();
+                });
+        }
+
+        // Timer counts & late warnings (>15m)
+        setInterval(function() {
+            document.querySelectorAll('.kds-card').forEach(function(card) {
+                let timeStr = card.getAttribute('data-time');
+                if (!timeStr) return;
+                
+                // Parse date string (standard ISO-ish)
+                let date = new Date(timeStr);
+                let diffMs = new Date() - date;
+                let diffMins = Math.floor(diffMs / 60000);
+                let diffSecs = Math.floor((diffMs % 60000) / 1000);
+                
+                let display = diffMins + ":" + (diffSecs < 10 ? "0" : "") + diffSecs;
+                card.querySelector('.timer-display').innerText = display + " (Đặt lúc " + date.toLocaleTimeString() + ")";
+
+                // Late check (> 15 minutes)
+                if (diffMins >= 15) {
+                    card.classList.add('delayed');
+                } else {
+                    card.classList.remove('delayed');
+                }
+            });
+        }, 1000);
+
+        function updateCounts() {
+            let pendingCount = document.querySelectorAll('.col-pending .kds-card').length;
+            let cookingCount = document.querySelectorAll('.col-cooking .kds-card').length;
+            let readyCount = document.querySelectorAll('.col-ready .kds-card').length;
+            let totalCount = pendingCount + cookingCount + readyCount;
+
+            document.getElementById('cnt-pending').innerText = pendingCount;
+            document.getElementById('cnt-cooking').innerText = cookingCount;
+            document.getElementById('cnt-ready').innerText = readyCount;
+            
+            let totalEl = document.getElementById('total-kds-count');
+            if (totalEl) {
+                totalEl.innerText = totalCount;
+            }
+        }
+        
+        window.addEventListener('DOMContentLoaded', updateCounts);
+    </script>
+</body>
+</html>
