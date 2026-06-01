@@ -78,15 +78,18 @@ public class AIService {
                         + dataContext.toString() + "\nUser asks: " + query;
 
                 String requestBody = "{"
-                        + "\"model\": \"gpt-4o-mini\","
-                        + "\"messages\": [{\"role\": \"user\", \"content\": \"" + prompt.replace("\n", "\\n").replace("\"", "\\\"") + "\"}]"
+                        + "\"contents\": [{"
+                        + "\"parts\": [{"
+                        + "\"text\": \"" + prompt.replace("\n", "\\n").replace("\"", "\\\"") + "\""
+                        + "}]"
+                        + "}]"
                         + "}";
+
 
                 HttpClient client = HttpClient.newHttpClient();
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create("https://api.openai.com/v1/chat/completions"))
+                        .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey))
                         .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + apiKey)
                         .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                         .build();
 
@@ -94,11 +97,12 @@ public class AIService {
                 if (response.statusCode() == 200) {
                     // Extract response content
                     String body = response.body();
-                    int contentStart = body.indexOf("\"content\": \"") + 12;
-                    int contentEnd = body.indexOf("\"", contentStart);
-                    if (contentStart > 11 && contentEnd > contentStart) {
-                        return body.substring(contentStart, contentEnd).replace("\\n", "\n").replace("\\\"", "\"");
+                    int textStart = body.indexOf("\"text\": \"") + 9;
+                    int textEnd = body.indexOf("\"", textStart);
+                    if (textStart > 8 && textEnd > textStart) {
+                        return body.substring(textStart, textEnd).replace("\\n", "\n").replace("\\\"", "\"");
                     }
+
                 }
             } catch (Exception e) {
                 log.error("Error calling OpenAI API, falling back to local analysis", e);

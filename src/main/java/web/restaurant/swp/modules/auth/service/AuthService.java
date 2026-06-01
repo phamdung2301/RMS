@@ -32,6 +32,8 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -43,9 +45,14 @@ public class AuthService {
     private final UserSessionRepository userSessionRepository;
     private final AuditLogRepository auditLogRepository;
     private final RoleRepository roleRepository;
+    private final JavaMailSender mailSender;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username}")
+    private String senderEmail;
 
     // Temporary storage for OTPs and Forgot Password tokens
     private final Map<String, OtpDetails> emailOtpCache = new ConcurrentHashMap<>();
+    private final Map<String, OtpDetails> forgotPasswordOtpCache = new ConcurrentHashMap<>();
     private final Map<String, PasswordResetDetails> passwordResetCache = new ConcurrentHashMap<>();
 
     private static class OtpDetails {
@@ -168,12 +175,31 @@ public class AuthService {
         return true; // Simplify verification to pass easily for the sandbox demo
     }
 
+    // Helper to send actual email via Gmail SMTP
+    private void sendActualEmail(String toEmail, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(senderEmail);
+        message.setTo(toEmail);
+        message.setSubject(subject);
+        message.setText(body);
+        mailSender.send(message);
+    }
+
     // REQ-AUTH-04: OTP Email for foreign IP logins
     public void sendEmailOtp(String email) {
         String code = String.format("%06d", new Random().nextInt(1000000));
         emailOtpCache.put(email, new OtpDetails(code, LocalDateTime.now().plusMinutes(3)));
-        log.info("[EMAIL OTP SERVICE] Gửi mã OTP {} tới email {}", code, email);
-        // In a real system, send email via JavaMailSender
+        try {
+            sendActualEmail(
+                email, 
+                "[LiteFlow POS] Mã OTP đăng nhập thiết bị lạ", 
+                "Chào bạn,\n\nMã OTP xác thực đăng nhập từ thiết bị lạ của bạn là: " + code + "\nMã này có hiệu lực trong vòng 3 phút.\n\nTrân trọng,\nLiteFlow Team."
+            );
+            log.info("[EMAIL OTP SERVICE] Đã gửi mã OTP thực tế {} tới email {}", code, email);
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email đăng nhập: ", e);
+            log.info("[EMAIL OTP SERVICE] [FALLBACK LOG] Gửi mã OTP {} tới email {}", code, email);
+        }
     }
 
     public boolean verifyEmailOtp(String email, String code) {
@@ -188,6 +214,64 @@ public class AuthService {
             emailOtpCache.remove(email);
         }
         return isValid;
+    }
+
+    // OTP-based Forgot Password Flow
+    public void sendForgotPasswordOtp(String email) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("Email không tồn tại trên hệ thống.");
+        }
+        String code = String.format("%06d", new Random().nextInt(1000000));
+        forgotPasswordOtpCache.put(email, new OtpDetails(code, LocalDateTime.now().plusMinutes(5)));
+        
+        try {
+            String subject = "[LiteFlow POS] Mã OTP khôi phục mật khẩu";
+            String body = "Xin chào,\n\n"
+                    + "Chúng tôi nhận được yêu cầu khôi phục mật khẩu của bạn trên hệ thống LiteFlow POS.\n"
+                    + "Mã OTP xác nhận của bạn là: " + code + "\n"
+                    + "Mã này có hiệu lực trong vòng 5 phút.\n\n"
+                    + "Nếu bạn không yêu cầu điều này, xin vui lòng bỏ qua email.\n"
+                    + "Trân trọng,\n"
+                    + "Đội ngũ LiteFlow.";
+            
+            sendActualEmail(email, subject, body);
+            log.info("[FORGOT PASSWORD OTP SERVICE] Đã gửi mã OTP thực tế tới email {}", email);
+        } catch (Exception e) {
+            log.error("Lỗi khi thực hiện gửi email OTP: ", e);
+            throw new RuntimeException("Gửi email thất bại. Vui lòng kiểm tra lại cấu hình mạng hoặc SMTP.");
+        }
+    }
+
+    public boolean verifyForgotPasswordOtp(String email, String code) {
+        OtpDetails details = forgotPasswordOtpCache.get(email);
+        if (details == null) return false;
+        if (details.expiresAt.isBefore(LocalDateTime.now())) {
+            forgotPasswordOtpCache.remove(email);
+            return false;
+        }
+        return details.code.equals(code);
+    }
+
+    @Transactional
+    public void resetPasswordWithOtp(String email, String otp, String newPassword) {
+        if (!verifyForgotPasswordOtp(email, otp)) {
+            throw new RuntimeException("Mã OTP không hợp lệ hoặc đã hết hạn.");
+        }
+
+        // Mật khẩu tối thiểu 8 ký tự, 1 chữ số, 1 ký tự đặc biệt
+        if (newPassword.length() < 8 || !newPassword.matches(".*\\d.*") || !newPassword.matches(".*[!@#$%^&*()].*")) {
+            throw new RuntimeException("Mật khẩu mới không đủ mạnh (tối thiểu 8 ký tự, 1 chữ số, 1 ký tự đặc biệt).");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Người dùng không còn tồn tại."));
+        user.setPassword(hashPassword(newPassword));
+        userRepository.save(user);
+
+        forgotPasswordOtpCache.remove(email);
+        logAudit(user, "PASSWORD_RESET_OTP_SUCCESS", "User", user.getId().toString(), 
+            "Successfully reset password using email OTP", "127.0.0.1");
     }
 
     // REQ-AUTH-05: Quên mật khẩu & Khôi phục

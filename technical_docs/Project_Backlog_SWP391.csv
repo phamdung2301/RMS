@@ -1,0 +1,188 @@
+﻿Epic / Phân Hệ,Mã US,Tên Chức Năng (User Story chuẩn Agile),Story Points,Độ Ưu Tiên,Acceptance Criteria (Tiêu Chí Nghiệm Thu Chi Tiết),Trạng Thái,Người Phụ Trách (Dev),Người Phụ Trách (Tester),Sprint Dự Kiến,Ghi Chú
+1. XÁC THỰC & BẢO MẬT (AUTH),US-01,"Là Nhân viên, tôi muốn đăng nhập hệ thống bằng Email và Mật khẩu để tôi truy cập vào đúng các chức năng nghiệp vụ của mình.",3,Cao,"1. Có form kiểm tra định dạng email hợp lệ.
+2. Mật khẩu nhập vào phải được ẩn.
+3. Khóa tài khoản tạm thời trong 15 phút nếu nhập sai quá 5 lần liên tiếp.",Done,Kha,Thuận,1,Đã tích hợp mã hóa BCrypt
+1. XÁC THỰC & BẢO MẬT (AUTH),US-02,"Là Người dùng, tôi muốn đăng nhập nhanh thông qua liên kết tài khoản Google OAuth2 để rút ngắn thời gian truy cập.",3,Cao,"1. Hiển thị nút 'Đăng nhập bằng Google' ở trang chủ.
+2. Tự động ánh xạ thông tin email Google với tài khoản nhân viên trong DB.
+3. Từ chối đăng nhập nếu email Google chưa được khai báo.",Done,Kha,Thuận,1,Sử dụng Spring Security OAuth2
+1. XÁC THỰC & BẢO MẬT (AUTH),US-03,"Là Người quản lý, tôi muốn kích hoạt xác thực 2 yếu tố (2FA TOTP) bằng Google Authenticator để gia tăng bảo mật dữ liệu nhạy cảm.",5,Trung bình,"1. Hiển thị mã QR và khóa bí mật (Secret Key) khi kích hoạt 2FA.
+2. Yêu cầu nhập mã OTP 6 số từ Google Authenticator để xác nhận bật thành công.
+3. Cho phép tắt 2FA sau khi nhập mật khẩu xác nhận.",Done,Kha,Thuận,1,Sử dụng thư viện Google TOTP
+1. XÁC THỰC & BẢO MẬT (AUTH),US-04,"Là Người dùng, tôi muốn nhận mã xác thực OTP gửi qua Email khi đăng nhập từ thiết bị lạ để ngăn chặn truy cập trái phép.",3,Trung bình,"1. Tự động quét IP đăng nhập.
+2. Nếu phát hiện IP lạ, yêu cầu nhập mã OTP gửi qua email đăng ký.
+3. Mã OTP qua email có hiệu lực trong vòng 3 phút.",Done,Kha,Thuận,1,Sử dụng JavaMailSender
+1. XÁC THỰC & BẢO MẬT (AUTH),US-05,"Là Người dùng quên mật khẩu, tôi muốn yêu cầu đặt lại mật khẩu qua email xác nhận để tôi chủ động lấy lại quyền truy cập.",3,Cao,"1. Có trang 'Quên mật khẩu' yêu cầu nhập email.
+2. Gửi link reset mật khẩu chứa token bảo mật dùng 1 lần (hạn dùng 15 phút).
+3. Cho phép nhập mật khẩu mới và xác nhận mật khẩu mới.",Done,Dũng,Lộc,1,Token hết hạn sau 15 phút
+1. XÁC THỰC & BẢO MẬT (AUTH),US-06,"Là Quản trị viên (Admin), tôi muốn thiết lập phân quyền vai trò chi tiết (RBAC) để giới hạn quyền truy cập các endpoint nghiệp vụ.",5,Cao,"1. Định nghĩa các role: ADMIN, MANAGER, CASHIER, KITCHEN, HR, WAREHOUSE.
+2. Giới hạn truy cập API bằng Spring Security `@PreAuthorize`.
+3. Trả về mã lỗi 403 Forbidden nếu người dùng không đủ thẩm quyền.",Done,Dũng,Lộc,1,Phân quyền theo Role-based
+1. XÁC THỰC & BẢO MẬT (AUTH),US-07,"Là Quản trị viên (Admin), tôi muốn hệ thống tự động ghi nhật ký kiểm toán (Audit Logs) để tôi theo dõi hoạt động nhạy cảm.",3,Cao,"1. Ghi nhận: ID người dùng, Hành động, Kiểu thực thể tác động, Chi tiết thay đổi, Địa chỉ IP, Thời điểm.
+2. Lưu vết khi thêm/sửa/xóa hóa đơn, điều chỉnh kho, thăng hạng thẻ khách.
+3. Không cho phép bất kỳ ai sửa hoặc xóa bản ghi trong bảng audit_logs.",Done,Dũng,Lộc,1,"Lưu trữ bảo mật, chỉ đọc"
+2. SƠ ĐỒ BÀN & POS (POS),US-08,"Là Thu ngân, tôi muốn xem sơ đồ khu vực và bàn ăn thời gian thực để tôi nắm rõ trạng thái trống/đầy và phục vụ khách.",5,Cao,"1. Hiển thị danh sách các khu vực (Sân trước, Phòng lạnh, Lầu 1...).
+2. Mỗi bàn ăn hiển thị màu sắc theo trạng thái: Xám (Trống), Đỏ (Đang ăn), Vàng (Đặt trước).
+3. Tự động đồng bộ trạng thái bàn khi có thay đổi từ các máy POS khác.",In Progress,Thuận,Kha,1,Đồng bộ WebSocket
+2. SƠ ĐỒ BÀN & POS (POS),US-09,"Là Thu ngân, tôi muốn mở phiên làm việc của bàn (Table Session) để bắt đầu gọi món phục vụ khách ngồi tại bàn.",3,Cao,"1. Cho phép nhấp vào bàn trống để 'Mở bàn'.
+2. Cho phép nhập số lượng khách ngồi thực tế (guest_count).
+3. Trạng thái bàn chuyển từ EMPTY sang OCCUPIED, tạo bản ghi table_sessions với trạng thái ACTIVE.",In Progress,Thuận,Kha,1,Lưu table_sessions
+2. SƠ ĐỒ BÀN & POS (POS),US-10,"Là Thu ngân, tôi muốn thêm món ăn vào giỏ hàng bàn ăn để ghi nhận yêu cầu gọi món của khách hàng.",3,Cao,"1. Hiển thị thực đơn trực quan phân loại theo Danh mục.
+2. Nhấp vào món ăn để thêm vào giỏ hàng bàn hiện tại.
+3. Tự động tính toán tổng tiền tạm tính của giỏ hàng.",In Progress,Lộc,Dũng,1,Tích hợp giỏ hàng POS
+2. SƠ ĐỒ BÀN & POS (POS),US-11,"Là Thu ngân, tôi muốn chọn biến thể món ăn (Size, Toppings, Đá, Nóng) để ghi nhận chi tiết khẩu vị khách.",3,Cao,"1. Khi chọn món, hiển thị cửa sổ popup cấu hình biến thể sản phẩm.
+2. Cho phép chọn 1 size (Standard, Medium, Large) và nhiều topping ăn kèm.
+3. Giá bán của biến thể và topping tự động cộng dồn vào đơn giá món ăn.",In Progress,Dũng,Lộc,1,Lưu product_variants
+2. SƠ ĐỒ BÀN & POS (POS),US-12,"Là Thu ngân, tôi muốn gửi yêu cầu làm món xuống Bếp để đầu bếp chuẩn bị chế biến đúng theo thứ tự gọi món.",5,Cao,"1. Có nút 'Gửi bếp' trên giỏ hàng POS.
+2. Sau khi gửi, khởi tạo bản ghi trong bảng orders (status = PENDING).
+3. Đẩy tin nhắn thông báo WebSocket chứa danh sách món cần làm sang màn hình hiển thị bếp KDS.",In Progress,Dũng,Lộc,1,Đẩy WebSocket sang KDS
+2. SƠ ĐỒ BÀN & POS (POS),US-13,"Là Thu ngân, tôi muốn tách hóa đơn thanh toán (Split Bill) khi một nhóm khách muốn tự thanh toán riêng phần của họ.",5,Trung bình,"1. Cho phép chọn các món ăn cụ thể trong giỏ hàng hiện tại.
+2. Chuyển các món đã chọn sang một hóa đơn mới riêng biệt.
+3. Giữ nguyên các món còn lại ở hóa đơn gốc tại bàn ăn.",In Progress,Kha,Thuận,1,Tách hóa đơn POS
+2. SƠ ĐỒ BÀN & POS (POS),US-14,"Là Thu ngân, tôi muốn ghép hóa đơn nhiều bàn (Merge Bill) khi các bàn đi chung nhóm muốn gộp tiền trả một thể.",5,Trung bình,"1. Cho phép chọn bàn nguồn và bàn đích cần gộp.
+2. Chuyển toàn bộ món từ bàn nguồn sang bàn đích.
+3. Tự động hủy phiên ăn ở bàn nguồn, chuyển bàn nguồn về trạng thái trống (EMPTY).",In Progress,Lộc,Dũng,1,Gộp hóa đơn POS
+2. SƠ ĐỒ BÀN & POS (POS),US-15,"Là Thu ngân, tôi muốn xuất mã QR VNPay để khách hàng quét thanh toán hóa đơn nhanh chóng và hạn chế sai số tiền mặt.",5,Cao,"1. Khi chọn thanh toán VNPay, gọi API VNPay Sandbox sinh chuỗi URL QR Code thanh toán.
+2. Hiển thị mã QR lên màn hình POS.
+3. Lắng nghe phản hồi giao dịch qua IPN endpoint để tự động xác nhận hóa đơn đã thanh toán.",In Progress,Kha,Thuận,1,Tích hợp SDK VNPay Sandbox
+3. HỆ THỐNG HIỂN THỊ BẾP (KDS),US-16,"Là Đầu bếp, tôi muốn xem danh sách các món ăn cần chế biến hiển thị thời gian thực theo thứ tự thời gian đặt để chuẩn bị kịp thời.",5,Cao,"1. Màn hình KDS tự động cập nhật món ăn mới ngay khi thu ngân nhấn 'Gửi bếp' mà không cần tải lại trang.
+2. Hiển thị chi tiết: Tên món, Biến thể, Số lượng, Ghi chú chế biến, Thời gian chờ (đếm ngược).
+3. Sắp xếp món theo thứ tự thời gian gọi món từ cũ đến mới.",Chưa bắt đầu,Kha,Thuận,2,Kết nối WebSocket KDS
+3. HỆ THỐNG HIỂN THỊ BẾP (KDS),US-17,"Là Đầu bếp, tôi muốn cập nhật trạng thái món ăn sang 'Đang làm' (COOKING) để thu ngân biết món ăn đang được chế biến.",2,Cao,"1. Nhấp vào thẻ món ăn trên KDS để đổi trạng thái sang COOKING.
+2. Đồng bộ trạng thái về màn hình POS của thu ngân thời gian thực.
+3. Cập nhật trạng thái trong bảng `order_details.status = 'COOKING'`.",Chưa bắt đầu,Kha,Thuận,2,Cập nhật order_details
+3. HỆ THỐNG HIỂN THỊ BẾP (KDS),US-18,"Là Đầu bếp, tôi muốn cập nhật trạng thái món ăn sang 'Đã xong' (READY) để phục vụ mang món ăn lên cho khách hàng.",2,Cao,"1. Nhấp vào nút 'Hoàn thành' trên thẻ món ở KDS.
+2. Đổi trạng thái sang READY, tự động đẩy thẻ món ăn vào danh sách chờ bưng.
+3. Bắn WebSocket thông báo pop-up lên màn hình POS báo phục vụ mang món ra bàn ăn.",Chưa bắt đầu,Thuận,Kha,2,Bắn WebSocket READY
+3. HỆ THỐNG HIỂN THỊ BẾP (KDS),US-19,"Là Người quản lý, tôi muốn hệ thống hiển thị cảnh báo đỏ khi một món ăn bị chế biến trễ quá 15 phút để tôi kịp thời điều phối bếp.",3,Trung bình,"1. Hệ thống đếm thời gian từ lúc order ở trạng thái PENDING.
+2. Nếu sau 15 phút chưa đổi sang READY, đổi màu thẻ món ăn trên KDS thành màu đỏ nhấp nháy.
+3. Gửi cảnh báo hiệu suất lên dashboard quản trị.",Chưa bắt đầu,Thuận,Kha,2,Hệ thống đếm thời gian thực
+3. HỆ THỐNG HIỂN THỊ BẾP (KDS),US-20,"Là Thu ngân, tôi muốn đánh dấu món ăn đã được phục vụ (SERVED) cho khách tại bàn để tôi chốt số lượng món thực tế đã dùng.",2,Cao,"1. Trên giỏ hàng POS hiển thị danh sách món READY.
+2. Cho phép nhấp chọn 'Đã phục vụ' (SERVED) khi phục vụ bưng món xong.
+3. Cập nhật `order_details.status = 'SERVED'`.",Chưa bắt đầu,Kha,Thuận,2,Cập nhật trạng thái chi tiết
+4. QUẢN LÝ DANH MỤC & THỰC ĐƠN (MENU),US-21,"Là Người quản lý, tôi muốn tạo mới danh mục món ăn (Category) để tôi phân loại thực đơn khoa học.",2,Cao,"1. Có giao diện thêm danh mục món (Ví dụ: Món chính, Đồ uống, Tráng miệng...).
+2. Yêu cầu nhập Tên danh mục không trùng lặp.
+3. Cho phép cập nhật thông tin hoặc xóa danh mục (chỉ xóa khi danh mục không chứa sản phẩm).",Chưa bắt đầu,Lộc,Dũng,2,Lưu bảng categories
+4. QUẢN LÝ DANH MỤC & THỰC ĐƠN (MENU),US-22,"Là Người quản lý, tôi muốn thêm món ăn mới vào thực đơn (Product) để tôi đa dạng hóa thực đơn phục vụ.",3,Cao,"1. Form nhập liệu gồm: Tên món, Mô tả, Hình ảnh (upload lên server), Danh mục liên kết.
+2. Kiểm tra tính hợp lệ dữ liệu bắt buộc.
+3. Tự động đồng bộ món ăn mới lên danh sách món ăn hiển thị tại POS.",Chưa bắt đầu,Lộc,Dũng,2,Lưu bảng products
+4. QUẢN LÝ DANH MỤC & THỰC ĐƠN (MENU),US-23,"Là Người quản lý, tôi muốn tạo các biến thể món ăn (Product Variants) để bán sản phẩm với nhiều kích cỡ và mức giá khác nhau.",3,Cao,"1. Cho phép thêm nhiều biến thể dưới 1 sản phẩm gốc.
+2. Nhập thông tin: Tên biến thể (Size M, Size L...), Giá bán gốc, Giá vốn gốc, Mã SKU (duy nhất), Cờ Topping.
+3. Ràng buộc khóa ngoại chính xác đến sản phẩm gốc.",Chưa bắt đầu,Dũng,Lộc,2,Lưu product_variants
+4. QUẢN LÝ DANH MỤC & THỰC ĐƠN (MENU),US-24,"Là Đầu bếp, tôi muốn ngưng phục vụ món ăn tạm thời khi nguyên liệu chế biến món ăn đó bị hết trong ngày.",2,Trung bình,"1. Cho phép chuyển đổi trạng thái `is_active = false` của sản phẩm hoặc biến thể tại trang quản trị.
+2. Món ăn bị tắt ngay lập tức ẩn khỏi màn hình POS của thu ngân.
+3. Tự động khôi phục hiển thị khi chuyển trạng thái thành `is_active = true`.",Chưa bắt đầu,Dũng,Lộc,2,Ẩn món tại POS
+4. QUẢN LÝ DANH MỤC & THỰC ĐƠN (MENU),US-25,"Là Người quản trị, tôi muốn xem lịch sử thay đổi giá bán của biến thể món ăn để giám sát biến động định giá sản phẩm.",2,Thấp,"1. Mỗi khi cập nhật `price` của biến thể, tự động lưu một dòng nhật ký vào bảng `audit_logs`.
+2. Ghi rõ: Giá cũ, Giá mới, Người thực hiện thay đổi.
+3. Cho phép lọc lịch sử đổi giá theo thời gian.",Chưa bắt đầu,Lộc,Dũng,2,Audit Log đổi giá
+5. QUẢN LÝ KHO NGUYÊN LIỆU (INVENTORY),US-26,"Là Nhân viên kho, tôi muốn quản lý danh mục nguyên liệu thô để phân loại các nguyên vật liệu sử dụng cho bếp nấu.",3,Cao,"1. Nhập thông tin: Mã nguyên liệu SKU (Ví dụ: MAT-001), Tên nguyên liệu, Đơn vị tính (kg, lít, lon, quả...), Ngưỡng tồn kho tối thiểu.
+2. Cho phép thêm mới, sửa thông tin nguyên vật liệu.",Chưa bắt đầu,Dũng,Lộc,3,Lưu inventory_items
+5. QUẢN LÝ KHO NGUYÊN LIỆU (INVENTORY),US-27,"Là Đầu bếp, tôi muốn thiết lập định mức nguyên liệu chế biến (Recipes) để hệ thống tự động trừ kho chi nhánh khi bán hàng.",5,Cao,"1. Cho phép liên kết 1 biến thể sản phẩm với nhiều nguyên vật liệu thô.
+2. Nhập định lượng cần dùng (`quantity_needed` - Ví dụ: 0.15 kg thịt bò nạm cho 1 tô Phở Bò Size Lớn).
+3. Khi hóa đơn POS thanh toán thành công, hệ thống tự động trừ tồn kho nguyên liệu tương ứng trong kho chi nhánh.",Chưa bắt đầu,Dũng,Lộc,3,Định lượng Recipes
+5. QUẢN LÝ KHO NGUYÊN LIỆU (INVENTORY),US-28,"Là Nhân viên kho, tôi muốn ghi nhận xuất kho/nhập kho thủ công khi có hao hụt rơi vỡ hoặc nhập thêm nguyên liệu ngoài.",3,Cao,"1. Có form tạo phiếu xuất/nhập kho thủ công.
+2. Chọn nguyên vật liệu, nhập số lượng thay đổi (+/-), lý do điều chỉnh.
+3. Tự động ghi nhật ký biến động vào bảng `inventory_logs` với loại STOCKIN hoặc STOCKOUT.",Chưa bắt đầu,Lộc,Dũng,3,Điều chỉnh tồn kho
+5. QUẢN LÝ KHO NGUYÊN LIỆU (INVENTORY),US-29,"Là Quản lý chi nhánh, tôi muốn nhận cảnh báo tự động khi tồn kho nguyên liệu xuống thấp hơn ngưỡng tối thiểu để kịp thời mua thêm.",3,Trung bình,"1. Hệ thống liên tục quét số lượng tồn kho thực tế trong `branch_inventory`.
+2. Nếu `quantity < reorder_point`, hiển thị biểu tượng cảnh báo màu vàng tại trang chủ Dashboard quản trị.
+3. Gợi ý lập đơn mua hàng PO cho nguyên vật liệu bị thiếu.",Chưa bắt đầu,Lộc,Dũng,3,Cảnh báo reorder_point
+5. QUẢN LÝ KHO NGUYÊN LIỆU (INVENTORY),US-30,"Là Nhân viên kho, tôi muốn thực hiện kiểm kê kho định kỳ và điều chỉnh chênh lệch tồn tồn kho thực tế.",5,Cao,"1. Cho phép tạo phiếu kiểm kê định kỳ.
+2. Nhập số lượng thực tế kiểm đếm tại kệ kho.
+3. Hệ thống tự động tính toán chênh lệch và cập nhật số lượng tồn kho về giá trị thực tế kiểm đếm, ghi log điều chỉnh.",Chưa bắt đầu,Dũng,Lộc,3,Kiểm kê & đối soát kho
+6. THU MUA & NHÀ CUNG CẤP (PROCUREMENT),US-31,"Là Nhân viên mua hàng, tôi muốn quản lý thông tin nhà cung cấp (Supplier Profile) để liên hệ đặt mua hàng hóa ngoài.",2,Cao,"1. Lưu trữ: Mã nhà cung cấp (Ví dụ: SUP-001), Tên nhà cung cấp, Email liên hệ, Số điện thoại, Địa chỉ.
+2. Ràng buộc không cho phép xóa nhà cung cấp đang có đơn hàng PO chưa hoàn thành.",Chưa bắt đầu,Kha,Thuận,3,Lưu bảng suppliers
+6. THU MUA & NHÀ CUNG CẤP (PROCUREMENT),US-32,"Là Nhân viên mua hàng, tôi muốn tạo đơn đặt hàng nhà cung cấp (Purchase Order - PO) để bổ sung nguyên vật liệu thô cho chi nhánh.",5,Cao,"1. Cho phép tạo phiếu đặt hàng PO trạng thái 'DRAFT'.
+2. Chọn Supplier, Chi nhánh nhận hàng, Hạn chót giao hàng, danh sách nguyên liệu kèm số lượng và đơn giá nhập hợp đồng.
+3. Tính tổng số tiền đơn hàng PO tự động.",Chưa bắt đầu,Kha,Thuận,3,Khởi tạo purchase_orders
+6. THU MUA & NHÀ CUNG CẤP (PROCUREMENT),US-33,"Là Quản lý chi nhánh, tôi muốn xem xét phê duyệt đơn đặt hàng PO để nhân viên tiến hành gửi email đặt hàng cho Supplier.",3,Cao,"1. Hiển thị danh sách các đơn hàng PO trạng thái DRAFT.
+2. Cho phép Quản lý nhấn 'Approve' (Chuyển trạng thái sang APPROVED) hoặc 'Reject' (Hủy đơn).
+3. Tự động gửi email thông báo đơn đặt hàng chứa danh sách nguyên vật liệu thô đến email nhà cung cấp.",Chưa bắt đầu,Thuận,Kha,3,Phê duyệt & Gửi mail tự động
+6. THU MUA & NHÀ CUNG CẤP (PROCUREMENT),US-34,"Là Nhân viên kho, tôi muốn lập phiếu nhận hàng (Goods Receipt - GRN) khi nhà cung cấp giao nguyên liệu đến chi nhánh.",3,Cao,"1. Cho phép chọn đơn hàng gốc PO đã được duyệt.
+2. Nhập số lượng thực tế nhận được (`quantity_received`) và số lượng bị lỗi từ chối nhận (`quantity_rejected`).
+3. Trạng thái đơn hàng PO cập nhật sang RECEIVED.",Chưa bắt đầu,Thuận,Kha,3,Lưu phiếu goods_receipts
+6. THU MUA & NHÀ CUNG CẤP (PROCUREMENT),US-35,"Là Quản lý chi nhánh, tôi muốn thực hiện đối chiếu 3 bên (Invoice Matching) để xác nhận thanh toán tài chính cho nhà cung cấp.",5,Trung bình,"1. Hệ thống tự động so khớp 3 thông tin: Đơn hàng ban đầu (PO) vs Phiếu thực nhận (GRN) vs Hóa đơn đòi tiền từ Supplier.
+2. Nếu sai lệch số lượng vượt quá 2%, hiển thị cảnh báo đỏ bắt buộc giải trình.
+3. Nếu khớp 100%, tự động cộng tồn kho vào chi nhánh và chuyển trạng thái PO thành hoàn tất thanh toán.",Chưa bắt đầu,Kha,Thuận,3,Quy trình Three-way Matching
+6. THU MUA & NHÀ CUNG CẤP (PROCUREMENT),US-36,"Là Nhân viên mua hàng, tôi muốn nhận cảnh báo đơn hàng PO bị giao trễ hạn để tôi liên hệ hối thúc nhà cung cấp.",2,Thấp,"1. Hệ thống quét các đơn PO trạng thái APPROVED chưa hoàn thành nhận hàng.
+2. Nếu ngày hiện tại vượt quá `delivery_deadline`, đổi trạng thái hiển thị của PO thành DELAYED trên trang danh sách đơn PO.",Chưa bắt đầu,Thuận,Kha,3,Cảnh báo giao hàng trễ
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-37,"Là Nhân viên nhân sự (HR), tôi muốn quản lý thông tin hồ sơ nhân viên để lưu trữ tập trung dữ liệu nhân sự của hệ thống.",3,Cao,"1. Lưu trữ: Mã nhân viên, Liên kết tài khoản hệ thống (`user_id`), Bộ phận làm việc, Chức danh, Ngày vào làm, Mức lương cơ bản, Hình thức tính lương (Fixed hoặc Hourly), Chi nhánh trực thuộc.
+2. Cho phép thêm mới nhân viên, sửa hồ sơ, chuyển chi nhánh hoạt động.",Chưa bắt đầu,Dũng,Lộc,4,Lưu bảng employees
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-38,"Là Nhân viên nhân sự (HR), tôi muốn thiết lập mẫu ca làm việc chuẩn để áp dụng phân ca nhanh chóng hàng tuần.",2,Cao,"1. Cho phép tạo các ca làm việc mẫu (Ví dụ: Ca sáng 8:00 - 16:00, Ca gãy 10:00 - 14:00...).
+2. Nhập: Tên ca, Giờ bắt đầu, Giờ kết thúc, Số giờ công quy đổi.
+3. Cho phép chỉnh sửa thông tin ca mẫu.",Chưa bắt đầu,Dũng,Lộc,4,Lưu shift_templates
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-39,"Là Nhân viên nhân sự (HR), tôi muốn phân lịch làm việc tuần cho nhân viên để nhân viên biết chính xác ca trực của mình.",3,Cao,"1. Có giao diện bảng phân ca theo tuần (Thứ 2 đến Chủ nhật).
+2. Cho phép gán nhanh Ca mẫu cho nhân viên vào ngày cụ thể.
+3. Ngăn chặn gán trùng 2 ca chồng chéo giờ làm trong cùng 1 ngày cho 1 nhân viên.",Chưa bắt đầu,Lộc,Dũng,4,Lưu employee_shift_assignments
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-40,"Là Nhân viên phục vụ, tôi muốn thực hiện chấm công vào/ra (Clock In / Clock Out) để ghi nhận thời gian làm việc thực tế.",3,Cao,"1. Có nút Clock In/Out nhanh trên giao diện nhân viên.
+2. Clock In: ghi nhận thời gian bắt đầu trực, tự động so khớp ca gán để đánh dấu đi trễ (is_late).
+3. Clock Out: ghi nhận thời gian ra ca, tính tổng số giờ công làm thực tế (hours_worked), tự động đánh dấu về sớm.",Chưa bắt đầu,Lộc,Dũng,4,Lưu employee_attendances
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-41,"Là Nhân viên phục vụ quên chấm công, tôi muốn gửi đơn báo quên chấm công (Forgot Clock Request) để xin Quản lý phê duyệt bổ sung công ca làm.",2,Trung bình,"1. Có form tạo yêu cầu quên chấm công.
+2. Chọn ngày quên, Giờ đề xuất bổ sung, Loại quên (Clock In hoặc Clock Out), Lý do giải trình.
+3. Trạng thái mặc định của đơn là PENDING.",Chưa bắt đầu,Dũng,Lộc,4,Tạo forgot_clock_requests
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-42,"Là Nhân viên phục vụ, tôi muốn gửi đơn xin nghỉ phép trực tuyến (Leave Request) để xin Quản lý duyệt nghỉ phép có lương hoặc không lương.",2,Trung bình,"1. Có form tạo đơn nghỉ phép.
+2. Chọn Ngày bắt đầu, Ngày kết thúc, Loại nghỉ phép (Phép năm ANNUAL, Nghỉ ốm SICK, Nghỉ không lương UNPAID), Lý do xin nghỉ.
+3. Tự động kiểm tra số ngày phép còn lại của nhân viên (nếu chọn ANNUAL).",Chưa bắt đầu,Dũng,Lộc,4,Tạo leave_requests
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-43,"Là Quản lý chi nhánh, tôi muốn phê duyệt hoặc từ chối các đơn từ của nhân viên (Leave / Forgot Clock) để tôi chốt công nhanh chóng.",3,Trung bình,"1. Có màn hình duyệt đơn tập trung của chi nhánh.
+2. Quản lý xem chi tiết giải trình và nhấn APPROVED hoặc REJECTED.
+3. Nếu duyệt APPROVED Forgot Clock, hệ thống tự động chèn/cập nhật giờ công vào bảng `employee_attendances` tương ứng.",Chưa bắt đầu,Lộc,Dũng,4,Tự động bù công sau khi duyệt
+"7. NHÂN SỰ, CHẤM CÔNG & TÍNH LƯƠNG (HR)",US-44,"Là Nhân viên nhân sự (HR), tôi muốn chạy tính lương tháng tự động (Payroll Run) để tính toán thu nhập thực tế chính xác cho nhân viên.",5,Cao,"1. Cho phép kích hoạt chạy bảng lương cho 1 tháng (Định dạng YYYY-MM).
+2. Hệ thống quét toàn bộ ngày công của nhân viên: Tính lương cứng cố định hoặc nhân giờ công nhân đơn giá giờ.
+3. Cộng các khoản allowances và trừ các khoản phạt đi trễ/đơn nghỉ không lương (deductions), lưu kết quả vào bảng `payroll_entries`.",Chưa bắt đầu,Lộc,Dũng,4,Chạy bảng lương tháng tự động
+8. KHÁCH HÀNG THÂN THIẾT & TÍCH ĐIỂM (LOYALTY),US-45,"Là Thu ngân, tôi muốn đăng ký hồ sơ hội viên mới tại POS lấy Số điện thoại (SĐT) làm định danh khóa chính duy nhất để tối ưu hóa tra cứu.",5,Trung bình,"1. Form nhập liệu gồm: SĐT (phone), Họ tên (name), Ngày sinh (birth_date).
+2. Kiểm tra tính hợp lệ: SĐT bắt buộc là duy nhất, không sử dụng cột surrogate ID tự tăng.
+3. Khởi tạo hạng thẻ mặc định là 'Bronze', tích lũy chi tiêu `total_spent = 0.0`.",Chưa bắt đầu,Kha,Thuận,4,Redesign: Phone as PK
+8. KHÁCH HÀNG THÂN THIẾT & TÍCH ĐIỂM (LOYALTY),US-46,"Là Hệ thống, tôi muốn tự động tích lũy chi tiêu và cộng điểm thưởng khi hội viên thanh toán hóa đơn để ghi nhận giá trị mua sắm.",3,Trung bình,"1. Khi hóa đơn POS gán SĐT hội viên đổi sang PAID, hệ thống kích hoạt Loyalty Service.
+2. Cộng dồn số tiền thanh toán thực tế vào cột `customers.total_spent`.
+3. Cộng điểm thưởng `loyalty_points` tương đương 1% tổng số tiền hóa đơn, lưu lịch sử loại EARNED.",Chưa bắt đầu,Kha,Thuận,4,Tự động tích lũy sau thanh toán
+8. KHÁCH HÀNG THÂN THIẾT & TÍCH ĐIỂM (LOYALTY),US-47,"Là Hệ thống, tôi muốn tự động nâng hạng thẻ thành viên (Membership Tiering) dựa trên chi tiêu tích lũy để tri ân đặc quyền cho khách.",3,Trung bình,"1. Sau khi cộng doanh số, so sánh `total_spent` để nâng hạng: Silver >= 5M VND, Gold >= 15M VND, Platinum >= 50M VND.
+2. Tự động cập nhật `membership_tier` trên bảng khách hàng.
+3. Mức chiết khấu mặc định của hạng thẻ tự động áp dụng cho hóa đơn kế tiếp (Silver: 5%, Gold: 10%, Platinum: 15%).",Chưa bắt đầu,Thuận,Kha,4,Tự động xếp hạng nâng thẻ
+8. KHÁCH HÀNG THÂN THIẾT & TÍCH ĐIỂM (LOYALTY),US-48,"Là Thu ngân, tôi muốn quy đổi điểm tích lũy của khách hàng thành tiền trừ trực tiếp vào hóa đơn khi có yêu cầu của khách.",3,Trung bình,"1. Cho phép nhập số điểm muốn quy đổi tại giỏ hàng POS (Tỷ lệ quy đổi: 1 điểm = 1,000 VNĐ).
+2. Khấu trừ trực tiếp số tiền tương ứng vào tổng tiền hóa đơn thanh toán.
+3. Trừ điểm thưởng của khách trên DB và lưu vết giao dịch loại REDEEMED.",Chưa bắt đầu,Thuận,Kha,4,Quy đổi điểm thưởng trực tiếp
+8. KHÁCH HÀNG THÂN THIẾT & TÍCH ĐIỂM (LOYALTY),US-49,"Là Hệ thống, tôi muốn tự động phát hành voucher giảm giá mừng sinh nhật hội viên để thúc đẩy doanh thu chăm sóc khách.",2,Thấp,"1. Hệ thống tự động quét ngày sinh nhật của khách hàng hàng ngày.
+2. Nếu trùng ngày sinh, tự động tạo mã coupon mừng sinh nhật thời hạn sử dụng 7 ngày.
+3. Gửi thông báo coupon về Cổng thông tin khách hàng.",Chưa bắt đầu,Kha,Thuận,4,Tặng voucher sinh nhật tự động
+8. KHÁCH HÀNG THÂN THIẾT & TÍCH ĐIỂM (LOYALTY),US-50,"Là Khách hàng, tôi muốn tự truy cập cổng Customer Portal bằng số điện thoại để kiểm tra điểm thưởng và hạng thẻ của mình.",2,Thấp,"1. Khách hàng truy cập đường dẫn `/customer-portal/{phone}`.
+2. Hiển thị thông tin: Họ tên, Hạng thẻ hiện tại, Số điểm tích lũy, Lịch sử giao dịch tích điểm/tiêu điểm.
+3. Giao diện tối ưu hiển thị trên các thiết bị di động cá nhân.",Chưa bắt đầu,Thuận,Kha,4,Customer Portal hiển thị di động
+9. CHƯƠNG TRÌNH KHUYẾN MÃI (PROMOTION),US-51,"Là Quản lý chi nhánh, tôi muốn cấu hình chương trình Khuyến mãi giảm giá theo món để áp dụng giảm trực tiếp giá món ăn.",3,Trung bình,"1. Nhập thông tin khuyến mãi: Tên chương trình, Mã coupon, Giá trị giảm (số tiền cố định hoặc tỷ lệ %), Thời gian hiệu lực.
+2. Cho phép chọn món ăn áp dụng trong thực đơn.
+3. Món ăn được hiển thị giá đã giảm trên màn hình bán hàng POS.",Chưa bắt đầu,Kha,Thuận,5,Khuyến mãi giảm giá theo món
+9. CHƯƠNG TRÌNH KHUYẾN MÃI (PROMOTION),US-52,"Là Quản lý chi nhánh, tôi muốn cấu hình chương trình Mua 1 Tặng 1 (Buy 1 Get 1 - B1G1) để đẩy nhanh doanh số tiêu thụ các món mới.",5,Trung bình,"1. Chọn sản phẩm kích hoạt (triggerProductId) và sản phẩm quà tặng (rewardProductId).
+2. Khi thu ngân thêm sản phẩm kích hoạt vào giỏ hàng POS, Promotion Engine tự động thêm món tặng giá 0 VNĐ vào giỏ.
+3. Tự động xóa món tặng nếu sản phẩm kích hoạt bị xóa khỏi giỏ.",Chưa bắt đầu,Kha,Thuận,5,Khuyến mãi Buy-1-Get-1
+9. CHƯƠNG TRÌNH KHUYẾN MÃI (PROMOTION),US-53,"Là Thu ngân, tôi muốn nhập mã giảm giá Coupon tại màn hình POS để chiết khấu hóa đơn cho khách có voucher.",3,Trung bình,"1. Có ô nhập mã Coupon tại giao diện checkout POS.
+2. Kiểm tra tính hợp lệ: Mã có tồn tại? Đơn hàng đạt giá trị tối thiểu? Đơn hàng nằm trong thời gian áp dụng? Giới hạn lượt dùng còn không?
+3. Áp dụng mức giảm giá vào tổng bill và lưu lịch sử dùng coupon vào bảng `promotion_usage`.",Chưa bắt đầu,Thuận,Kha,5,Áp dụng coupon thủ công
+9. CHƯƠNG TRÌNH KHUYẾN MÃI (PROMOTION),US-54,"Là Hệ thống, tôi muốn tự động áp dụng chương trình khuyến mãi có lợi nhất cho khách hàng để tăng trải nghiệm hài lòng mua sắm.",5,Trung bình,"1. Khi thanh toán, Promotion Engine tự động duyệt toàn bộ coupon khả dụng trong DB.
+2. So sánh số tiền được giảm của từng coupon.
+3. Tự động áp dụng coupon giảm giá nhiều tiền nhất (tối ưu nhất) vào hóa đơn mà khách hàng không cần nhập mã.",Chưa bắt đầu,Thuận,Kha,5,Thuật toán áp dụng Optimal Promo
+10. VẬN HÀNH ĐA CHI NHÁNH (MULTI-BRANCH),US-55,"Là Chủ chuỗi (Admin), tôi muốn quản lý danh sách các chi nhánh cửa hàng để tôi mở rộng hoặc theo dõi toàn bộ cơ sở kinh doanh.",3,Cao,"1. Giao diện quản lý chi nhánh gồm: Mã chi nhánh (branch_id), Tên chi nhánh, Địa chỉ, Số điện thoại, trạng thái hoạt động.
+2. Cho phép thêm mới chi nhánh, tạm ngưng hoạt động (`is_active = false`) hoặc mở lại chi nhánh.",Chưa bắt đầu,Dũng,Lộc,5,Quản lý bảng branches
+10. VẬN HÀNH ĐA CHI NHÁNH (MULTI-BRANCH),US-56,"Là Chủ chuỗi (Admin), tôi muốn hệ thống phân tách dữ liệu hoạt động theo chi nhánh để bảo mật thông tin và tránh nhầm lẫn.",5,Cao,"1. Tài khoản Cashier/Manager được gán cố định `branch_id`.
+2. Spring Security chặn yêu cầu và tự động lọc dữ liệu qua JPA: Chỉ cho phép xem/thao tác kho, bàn ăn, nhân sự, hóa đơn thuộc chi nhánh mình trực thuộc.
+3. Tài khoản Super Admin (`branch_id = NULL`) có quyền xem toàn chuỗi.",Chưa bắt đầu,Dũng,Lộc,5,Cơ chế Logical Isolation
+10. VẬN HÀNH ĐA CHI NHÁNH (MULTI-BRANCH),US-57,"Là Người quản lý, tôi muốn điều chỉnh giá bán và trạng thái món ăn riêng biệt theo chi nhánh để bù đắp chênh lệch chi phí vận hành vùng miền.",3,Trung bình,"1. Có giao diện cấu hình giá thực đơn riêng cho chi nhánh.
+2. Cho phép điền `custom_price` của từng biến thể món ăn riêng biệt.
+3. Cho phép bật/tắt phục vụ món ăn dựa trên nguồn nguyên liệu tại chỗ, lưu vào bảng `branch_product_prices`.",Chưa bắt đầu,Lộc,Dũng,5,Giá bán riêng chi nhánh
+10. VẬN HÀNH ĐA CHI NHÁNH (MULTI-BRANCH),US-58,"Là Quản lý chi nhánh con, tôi muốn tạo phiếu đặt hàng bổ sung nguyên vật liệu nội bộ (IPO) gửi lên Kho tổng khi chi nhánh sắp hết hàng.",3,Trung bình,"1. Tự động gợi ý tạo đơn khi tồn kho dưới ngưỡng `reorder_point`.
+2. Cho phép tạo đơn hàng nội bộ IPO chọn gửi đến chi nhánh được định nghĩa là Kho tổng (`is_warehouse = true`).
+3. Trạng thái phiếu đặt nội bộ mặc định là SUBMITTED.",Chưa bắt đầu,Lộc,Dũng,5,Đơn hàng nội bộ IPO
+10. VẬN HÀNH ĐA CHI NHÁNH (MULTI-BRANCH),US-59,"Là Quản lý chi nhánh, tôi muốn thực hiện quy trình chuyển kho nội bộ và đối soát hao hụt để luân chuyển nguyên vật liệu trong chuỗi.",5,Trung bình,"1. Xuất hàng (Ship): Giảm tồn kho ở kho nguồn, đổi trạng thái phiếu sang SHIPPED, hàng đi vào trạng thái Đang vận chuyển.
+2. Nhận hàng (Receive): Kho đích kiểm đếm nhập số lượng thực nhận, tự động tính chênh lệch hao hụt rơi vỡ (`loss_quantity = shipped - received`) và lý do.
+3. Cộng kho đích theo số lượng thực nhận, lưu lịch sử logs.",Chưa bắt đầu,Dũng,Lộc,5,Chuyển kho & đối soát hao hụt
+11. BÁO CÁO & PHÂN TÍCH (ANALYTICS),US-60,"Là Quản lý chi nhánh, tôi muốn xem báo cáo doanh thu theo chi nhánh trực quan theo ngày, tuần, tháng để đánh giá tình hình kinh doanh.",5,Cao,"1. Có trang Dashboard hiển thị biểu đồ đường cột doanh thu.
+2. Hỗ trợ lọc doanh thu theo Chi nhánh, Phương thức thanh toán (Tiền mặt/VNPay), Thời gian.
+3. Lấy dữ liệu từ bảng orders có trạng thái SERVED.",Chưa bắt đầu,Kha,Thuận,6,Dashboard báo cáo doanh số
+11. BÁO CÁO & PHÂN TÍCH (ANALYTICS),US-61,"Là Quản lý, tôi muốn xuất báo cáo doanh thu và báo cáo xuất nhập kho ra tệp Excel để phục vụ đối soát kế toán.",3,Cao,"1. Có nút 'Xuất Excel' trên các trang báo cáo doanh số và báo cáo tồn kho.
+2. Tự động sinh tệp Excel chứa dữ liệu thô đã được định dạng cột rõ ràng.
+3. Cho phép tải tệp trực tiếp về máy tính cá nhân.",Chưa bắt đầu,Kha,Thuận,6,Tải báo cáo định dạng Excel
+11. BÁO CÁO & PHÂN TÍCH (ANALYTICS),US-62,"Là Người quản lý, tôi muốn xem thống kê hiệu quả sử dụng của các chương trình khuyến mãi để điều chỉnh ngân sách tiếp thị.",3,Trung bình,"1. Hiển thị báo cáo số lượng coupon đã sử dụng, tổng số tiền đã giảm giá theo từng chương trình.
+2. Tính toán tỷ lệ chuyển đổi của các chiến dịch.
+3. Lọc dữ liệu dựa trên bảng promotion_usage.",Chưa bắt đầu,Thuận,Kha,6,Báo cáo hiệu quả khuyến mãi
+11. BÁO CÁO & PHÂN TÍCH (ANALYTICS),US-63,"Là Người quản lý, tôi muốn xem thống kê tỷ lệ quay lại của khách hàng thành VIP để đánh giá mức độ trung thành của hội viên.",2,Thấp,"1. Báo cáo phân tích số lượng khách hàng theo từng phân hạng thẻ (Bronze, Silver, Gold, Platinum).
+2. Thống kê tần suất ăn uống trung bình của khách hàng thành viên có gán SĐT.
+3. Hiển thị biểu đồ phân bố trực quan.",Chưa bắt đầu,Thuận,Kha,6,Báo cáo phân tích hội viên VIP
+11. BÁO CÁO & PHÂN TÍCH (ANALYTICS),US-64,"Là Chủ chuỗi (Admin), tôi muốn trò chuyện trực tiếp với Trợ lý AI Assistant để phân tích nhanh doanh số và đề xuất giải pháp tối ưu hoạt động chuỗi.",5,Trung bình,"1. Có giao diện chatbox AI tích hợp ngay trên Dashboard quản trị.
+2. Cho phép nhập câu hỏi phân tích (Ví dụ: 'Món ăn nào bán chạy nhất chi nhánh quận 1 tháng này?').
+3. Trợ lý AI kết nối an toàn với Gemini API, truy vấn cơ sở dữ liệu bán hàng và trả về câu trả lời phân tích dưới 3 giây.",Chưa bắt đầu,Kha,Thuận,6,Tích hợp Gemini AI Service

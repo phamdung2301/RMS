@@ -1,0 +1,64 @@
+.schedule-grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-surface);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        .schedule-grid-table th {
+            padding: 16px;
+            border-bottom: 2px solid var(--border-color);
+            background: rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .schedule-grid-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            vertical-align: top;
+            height: 110px;
+            width: 12%;
+        }
+        .employee-col {
+            width: 15% !important;
+            font-weight: 600;
+            background: rgba(255,255,255,0.01);
+        }
+        .shift-badge {
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .shift-badge:hover {
+            transform: scale(1.03);
+        }
+        .shift-morning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: #f59e0b; }
+        .shift-afternoon { background: rgba(99, 102, 241, 0.15); color: #818cf8; border-color: #818cf8; }
+        .shift-night { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: #34d399; }
+        .no-shift {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-align: center;
+            padding-top: 30px;
+        }
+        .active-tab {
+            background: var(--color-primary) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        /* Mobile responsive adjustments for schedule planner */
+        @media (max-width: 768px) {
+            .schedule-grid-table {
+                min-width: 800px;
+            }
+            .calendar-month-grid, #month-grid-days {
+                min-width: 600px;
+            }
+        }

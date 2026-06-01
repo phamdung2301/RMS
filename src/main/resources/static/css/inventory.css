@@ -1,0 +1,9 @@
+.low-stock-alert {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--color-danger);
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }

@@ -19,5 +19,6 @@ INSERT INTO users (id, email, password, name, is_active, failed_login_attempts, 
 (17, 'staff17@liteflow.com', '$2a$10$7eq/t4lk9f9gu4CNmWPIZOJ4ktC6wwMeSazvIZsiP8l.ceOVCVe4y', 'Nhân viên 17', true, 0, 'branch-3', false),
 (18, 'staff18@liteflow.com', '$2a$10$7eq/t4lk9f9gu4CNmWPIZOJ4ktC6wwMeSazvIZsiP8l.ceOVCVe4y', 'Nhân viên 18', true, 0, 'branch-1', false),
 (19, 'staff19@liteflow.com', '$2a$10$7eq/t4lk9f9gu4CNmWPIZOJ4ktC6wwMeSazvIZsiP8l.ceOVCVe4y', 'Nhân viên 19', true, 0, 'branch-2', false),
-(20, 'staff20@liteflow.com', '$2a$10$7eq/t4lk9f9gu4CNmWPIZOJ4ktC6wwMeSazvIZsiP8l.ceOVCVe4y', 'Nhân viên 20', true, 0, 'branch-3', false)
+(20, 'staff20@liteflow.com', '$2a$10$7eq/t4lk9f9gu4CNmWPIZOJ4ktC6wwMeSazvIZsiP8l.ceOVCVe4y', 'Nhân viên 20', true, 0, 'branch-3', false),
+(21, 'phamhadacdung2301@gmail.com', '$2a$10$7eq/t4lk9f9gu4CNmWPIZOJ4ktC6wwMeSazvIZsiP8l.ceOVCVe4y', 'Phạm Hà Đắc Dũng (Google Admin)', true, 0, NULL, false)
 ON CONFLICT (id) DO NOTHING;

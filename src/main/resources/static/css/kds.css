@@ -1,0 +1,130 @@
+.kds-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .kds-column {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .col-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 700;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 4px;
+        }
+        .col-pending { border-top: 4px solid var(--text-muted); }
+        .col-cooking { border-top: 4px solid var(--color-warning); }
+        .col-ready { border-top: 4px solid var(--color-success); }
+        
+        .kds-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+        .kds-card.delayed {
+            border-color: var(--color-danger);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.05);
+        }
+        .kds-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 8px;
+        }
+        .table-name {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .dish-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .dish-meta {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .qty-badge {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--color-success);
+        }
+        .card-timer {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .btn-kds {
+            padding: 6px;
+            font-size: 12px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            font-weight: 600;
+        }
+        .btn-kds-active {
+            background: var(--color-primary);
+            color: white;
+        }
+        .btn-kds-inactive {
+            background: rgba(255,255,255,0.06);
+            color: var(--text-muted);
+        }
+        .kds-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Mobile KDS adjustments */
+        @media (max-width: 1024px) {
+            .kds-container {
+                grid-template-columns: 1fr 1fr;
+                height: auto;
+                overflow: visible;
+            }
+        }
+        @media (max-width: 768px) {
+            .kds-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow: visible;
+            }
+            .kds-top-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+        }

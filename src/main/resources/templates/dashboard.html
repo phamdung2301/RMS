@@ -4,148 +4,7 @@
     <meta charset="UTF-8">
     <title>LiteFlow Admin - Báo Cáo & Phân Tích</title>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
-    <style>
-        .chart-container {
-            height: 250px;
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            padding-top: 20px;
-            border-bottom: 2px solid var(--border-color);
-            margin-bottom: 20px;
-        }
-        .chart-bar-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-grow: 1;
-            height: 100%;
-            justify-content: flex-end;
-            gap: 8px;
-        }
-        .chart-bar {
-            width: 32px;
-            background: linear-gradient(180deg, var(--color-success), var(--color-primary));
-            border-radius: 6px 6px 0 0;
-            transition: height 0.5s ease;
-        }
-        .chart-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-align: center;
-        }
-        .sidebar-right {
-            width: 320px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-        .main-layout {
-            display: flex;
-            gap: 24px;
-            flex-grow: 1;
-        }
-        .dashboard-body {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-        .seller-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            border-left: 3px solid var(--color-primary);
-        }
-        /* AI Chat styling */
-        .chat-box {
-            display: flex;
-            flex-direction: column;
-            height: 380px;
-            background: var(--bg-surface);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        .chat-messages {
-            flex-grow: 1;
-            padding: 16px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            font-size: 14px;
-        }
-        .message {
-            padding: 10px 14px;
-            border-radius: 12px;
-            max-width: 85%;
-            line-height: 1.4;
-        }
-        .msg-ai {
-            background: rgba(99, 102, 241, 0.15);
-            border-left: 3px solid var(--color-primary);
-            align-self: flex-start;
-        }
-        .msg-user {
-            background: var(--color-primary);
-            color: white;
-            align-self: flex-end;
-        }
-        .chat-input-area {
-            display: flex;
-            padding: 8px;
-            border-top: 1px solid var(--border-color);
-            background: rgba(0,0,0,0.2);
-        }
-        .chat-text {
-            flex-grow: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: white;
-            padding: 8px;
-            font-size: 14px;
-        }
-        .chat-send {
-            background: var(--color-primary);
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-
-        /* Responsive adjustments for Dashboard */
-        @media (max-width: 992px) {
-            .main-layout {
-                flex-direction: column;
-            }
-            .sidebar-right {
-                width: 100%;
-            }
-            .chat-box {
-                height: 320px;
-            }
-        }
-        
-        @media (max-width: 600px) {
-            .chart-container {
-                height: 200px;
-                padding-top: 10px;
-                gap: 8px;
-            }
-            .chart-bar {
-                width: 20px;
-            }
-            .chart-label {
-                font-size: 10px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <script th:src="@{/js/toast.js}"></script>
 </head>
 <body>
@@ -263,21 +122,6 @@
                         </div>
                     </div>
 
-                    <!-- AI Assistant -->
-                    <div class="chat-box glass-panel" style="padding: 0;">
-                        <div style="background: rgba(255,255,255,0.03); padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px;">
-                            <span>✨ Trợ lý ảo AI - LiteFlow</span>
-                        </div>
-                        <div class="chat-messages" id="chatMessages">
-                            <div class="message msg-ai">
-                                Xin chào! Tôi là trợ lý AI của hệ thống LiteFlow. Tôi có thể giúp gì cho việc vận hành nhà hàng hôm nay?
-                            </div>
-                        </div>
-                        <div class="chat-input-area">
-                            <input type="text" id="chatInput" class="chat-text" placeholder="Hỏi AI (doanh số, nguyên liệu...)" onkeydown="if(event.key==='Enter') sendChatMessage()">
-                            <button class="chat-send" onclick="sendChatMessage()">Gửi</button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -510,6 +354,251 @@
                 })
                 .catch(err => showToast("Lỗi: " + err.message, "error"));
         }
+    </script>
+
+    <!-- Floating Draggable Chatbot Button (LF Sparkle AI Branding) -->
+    <button class="chat-toggle-btn" id="chatToggleBtn">
+        <svg viewBox="0 0 100 100" style="width: 38px; height: 38px; fill: none;">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3" />
+            <path d="M22,65 Q36,38 50,65 T78,65" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="4" stroke-linecap="round" />
+            <text x="31" y="59" font-family="'Outfit', 'Inter', sans-serif" font-weight="900" font-size="26" fill="white" letter-spacing="-1.5">LF</text>
+            <path d="M68,22 L71,30 L79,33 L71,36 L68,44 L65,36 L57,33 L65,30 Z" fill="#fef08a" class="ai-sparkle-star" />
+            <path d="M28,24 L29.5,27 L33,28 L29.5,29 L28,32 L26.5,29 L23,28 L26.5,27 Z" fill="#e0e7ff" opacity="0.8" />
+        </svg>
+    </button>
+
+    <div class="chat-box glass-panel" id="floatingChatBox">
+        <div class="chat-header" id="chatHeader" style="cursor: default;">
+            <span style="display: flex; align-items: center; gap: 8px;">✨ Trợ lý ảo AI - LiteFlow</span>
+            <button onclick="toggleChat()" style="background: none; border: none; color: rgba(255,255,255,0.6); font-size: 20px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">&times;</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message msg-ai">
+                Xin chào! Tôi là trợ lý AI của hệ thống LiteFlow. Tôi có thể giúp gì cho việc vận hành nhà hàng hôm nay?
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" class="chat-text" placeholder="Hỏi AI (doanh số, nguyên liệu...)" onkeydown="if(event.key==='Enter') sendChatMessage()">
+            <button class="chat-send" onclick="sendChatMessage()">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleChat() {
+            const chatBox = document.getElementById('floatingChatBox');
+            chatBox.classList.toggle('active');
+            if (chatBox.classList.contains('active')) {
+                updateChatBoxPosition();
+                document.getElementById('chatInput').focus();
+            }
+        }
+
+        function updateChatBoxPosition() {
+            const chatBox = document.getElementById('floatingChatBox');
+            const toggleBtn = document.getElementById('chatToggleBtn');
+            
+            const rect = toggleBtn.getBoundingClientRect();
+            const btnLeft = rect.left;
+            const btnTop = rect.top;
+            const btnWidth = rect.width;
+            const btnHeight = rect.height;
+            
+            const chatWidth = 360;
+            const chatHeight = 480;
+            const padding = 15;
+            
+            let leftPos = btnLeft - chatWidth - padding;
+            let topPos = btnTop - chatHeight + btnHeight;
+            
+            // Boundary check - if too close to the left, open to the right
+            if (leftPos < padding) {
+                leftPos = btnLeft + btnWidth + padding;
+            }
+            
+            // Boundary check - if too close to the top, open below
+            if (topPos < padding) {
+                topPos = btnTop + btnHeight + padding;
+            }
+            
+            // Boundary check - make sure it doesn't overflow right
+            if (leftPos + chatWidth > window.innerWidth - padding) {
+                leftPos = window.innerWidth - chatWidth - padding;
+            }
+            
+            // Boundary check - make sure it doesn't overflow bottom
+            if (topPos + chatHeight > window.innerHeight - padding) {
+                topPos = window.innerHeight - chatHeight - padding;
+            }
+            
+            chatBox.style.left = `${leftPos}px`;
+            chatBox.style.top = `${topPos}px`;
+            chatBox.style.bottom = 'auto';
+            chatBox.style.right = 'auto';
+        }
+
+        // Dragging logic for the Floating Icon
+        (function() {
+            const toggleBtn = document.getElementById('chatToggleBtn');
+            const chatBox = document.getElementById('floatingChatBox');
+            
+            let isDragging = false;
+            let startX, startY;
+            let initialLeft, initialTop;
+            let startTime;
+            
+            toggleBtn.addEventListener('mousedown', dragStart);
+            
+            function dragStart(e) {
+                if (e.button !== 0) return;
+                isDragging = true;
+                startTime = Date.now();
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const rect = toggleBtn.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                
+                toggleBtn.style.bottom = 'auto';
+                toggleBtn.style.right = 'auto';
+                toggleBtn.style.left = `${initialLeft}px`;
+                toggleBtn.style.top = `${initialTop}px`;
+                
+                toggleBtn.style.transition = 'none';
+                if (chatBox.classList.contains('active')) {
+                    chatBox.style.transition = 'none';
+                }
+                
+                document.addEventListener('mousemove', dragMove);
+                document.addEventListener('mouseup', dragEnd);
+                
+                e.preventDefault();
+            }
+            
+            function dragMove(e) {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+                
+                const rect = toggleBtn.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                if (newLeft < 10) newLeft = 10;
+                if (newLeft + rect.width > viewportWidth - 10) newLeft = viewportWidth - rect.width - 10;
+                if (newTop < 10) newTop = 10;
+                if (newTop + rect.height > viewportHeight - 10) newTop = viewportHeight - rect.height - 10;
+                
+                toggleBtn.style.left = `${newLeft}px`;
+                toggleBtn.style.top = `${newTop}px`;
+                
+                if (chatBox.classList.contains('active')) {
+                    updateChatBoxPosition();
+                }
+            }
+            
+            function dragEnd(e) {
+                isDragging = false;
+                toggleBtn.style.transition = '';
+                chatBox.style.transition = '';
+                
+                document.removeEventListener('mousemove', dragMove);
+                document.removeEventListener('mouseup', dragEnd);
+                
+                const dragDuration = Date.now() - startTime;
+                const displacement = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
+                
+                if (dragDuration < 300 && displacement < 6) {
+                    toggleChat();
+                }
+            }
+            
+            // Touch support for mobile devices
+            toggleBtn.addEventListener('touchstart', touchStart, { passive: true });
+            
+            function touchStart(e) {
+                const touch = e.touches[0];
+                isDragging = true;
+                startTime = Date.now();
+                
+                startX = touch.clientX;
+                startY = touch.clientY;
+                
+                const rect = toggleBtn.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                
+                toggleBtn.style.bottom = 'auto';
+                toggleBtn.style.right = 'auto';
+                toggleBtn.style.left = `${initialLeft}px`;
+                toggleBtn.style.top = `${initialTop}px`;
+                
+                toggleBtn.style.transition = 'none';
+                if (chatBox.classList.contains('active')) {
+                    chatBox.style.transition = 'none';
+                }
+                
+                document.addEventListener('touchmove', touchMove, { passive: false });
+                document.addEventListener('touchend', touchEnd);
+            }
+            
+            function touchMove(e) {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+                
+                const rect = toggleBtn.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                if (newLeft < 10) newLeft = 10;
+                if (newLeft + rect.width > viewportWidth - 10) newLeft = viewportWidth - rect.width - 10;
+                if (newTop < 10) newTop = 10;
+                if (newTop + rect.height > viewportHeight - 10) newTop = viewportHeight - rect.height - 10;
+                
+                toggleBtn.style.left = `${newLeft}px`;
+                toggleBtn.style.top = `${newTop}px`;
+                
+                if (chatBox.classList.contains('active')) {
+                    updateChatBoxPosition();
+                }
+                
+                e.preventDefault();
+            }
+            
+            function touchEnd(e) {
+                isDragging = false;
+                toggleBtn.style.transition = '';
+                chatBox.style.transition = '';
+                
+                document.removeEventListener('touchmove', touchMove);
+                document.removeEventListener('touchend', touchEnd);
+                
+                const dragDuration = Date.now() - startTime;
+                const touch = e.changedTouches[0];
+                const displacement = Math.sqrt(Math.pow(touch.clientX - startX, 2) + Math.pow(touch.clientY - startY, 2));
+                
+                if (dragDuration < 300 && displacement < 6) {
+                    toggleChat();
+                }
+            }
+            
+            window.addEventListener('resize', function() {
+                if (chatBox.classList.contains('active')) {
+                    updateChatBoxPosition();
+                }
+            });
+        })();
     </script>
 </body>
 </html>

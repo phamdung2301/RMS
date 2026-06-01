@@ -19,5 +19,6 @@ INSERT INTO user_roles (user_id, role_id) VALUES
 (17, 3),
 (18, 8),
 (19, 3),
-(20, 8)
+(20, 8),
+(21, 1)
 ON CONFLICT (user_id, role_id) DO NOTHING;

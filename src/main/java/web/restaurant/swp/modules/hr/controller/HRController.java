@@ -293,6 +293,11 @@ public class HRController {
                 model.addAttribute("forgotRequests", forgotClockRequestRepository.findByEmployeeId(employee.getId()));
             } else {
                 model.addAttribute("noEmployeeProfile", true);
+                model.addAttribute("canClockIn", false);
+                model.addAttribute("canClockOut", false);
+                model.addAttribute("attendance", null);
+                model.addAttribute("leaveRequests", new java.util.ArrayList<>());
+                model.addAttribute("forgotRequests", new java.util.ArrayList<>());
             }
         }
         return "employees";
