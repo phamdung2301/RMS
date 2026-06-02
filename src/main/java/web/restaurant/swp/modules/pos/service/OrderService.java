@@ -256,11 +256,17 @@ public class OrderService {
 
     @Transactional
     public void confirmPayment(Long sessionId, double amountPaid) {
+        confirmPayment(sessionId, amountPaid, "CASH");
+    }
+
+    @Transactional
+    public void confirmPayment(Long sessionId, double amountPaid, String paymentMethod) {
         TableSession session = tableSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phiên bàn cần thanh toán."));
         
         session.setPaymentStatus("PAID");
         session.setStatus("COMPLETED");
+        session.setPaymentMethod(paymentMethod);
         session.setCheckOutTime(LocalDateTime.now());
         tableSessionRepository.save(session);
 
@@ -284,6 +290,6 @@ public class OrderService {
             loyaltyService.accumulatePoints(session.getCustomer().getId(), amountPaid);
         }
         
-        log.info("Thanh toán thành công cho Session {}, Bàn {}, Tổng tiền: {}", sessionId, table.getName(), amountPaid);
+        log.info("Thanh toán thành công ({}) cho Session {}, Bàn {}, Tổng tiền: {}", paymentMethod, sessionId, table.getName(), amountPaid);
     }
 }

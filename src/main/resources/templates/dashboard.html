@@ -25,6 +25,7 @@
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
                     <li class="nav-item" th:if="${isSuperAdmin}"><a href="#" onclick="openBranchAdminManager()">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isSuperAdmin}"><a href="#" onclick="openBankSettingsModal()">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -351,6 +352,104 @@
                 .then(data => {
                     showToast(data.message, "success");
                     loadBranchAdmins();
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
+        }
+    </script>
+
+    <!-- Bank Settings Modal (Super Admin only) -->
+    <div class="modal-overlay" id="bankSettingsModal" th:if="${isSuperAdmin}">
+        <div class="modal-box" style="width: 500px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 20px; font-weight: 700;">💳 Cấu hình Tài khoản Ngân hàng</h3>
+                <button class="modal-close" onclick="closeBankSettingsModal()">×</button>
+            </div>
+            
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
+                <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">Ngân hàng thụ hưởng</label>
+                        <select id="cfgBankCode" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px; width: 100%;">
+                            <option value="VCB">Vietcombank (VCB)</option>
+                            <option value="ICB">VietinBank (ICB)</option>
+                            <option value="BIDV">BIDV</option>
+                            <option value="VBA">Agribank (VBA)</option>
+                            <option value="TCB">Techcombank (TCB)</option>
+                            <option value="MB">Ngân hàng Quân đội (MB)</option>
+                            <option value="ACB">ACB</option>
+                            <option value="TPB">TPBank (TPB)</option>
+                            <option value="VPB">VPBank (VPB)</option>
+                            <option value="STB">Sacombank (STB)</option>
+                            <option value="HDB">HDBank (HDB)</option>
+                            <option value="SHB">SHB</option>
+                            <option value="VIB">VIB</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">Số tài khoản</label>
+                        <input type="text" id="cfgAccountNumber" class="form-input" placeholder="Nhập số tài khoản..." style="padding: 8px 12px; width: 100%;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">Tên chủ tài khoản (Không dấu, VIẾT HOA)</label>
+                        <input type="text" id="cfgAccountHolder" class="form-input" placeholder="Ví dụ: NGUYEN VAN A..." style="padding: 8px 12px; width: 100%;">
+                    </div>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                        <button class="btn btn-secondary" onclick="closeBankSettingsModal()" style="padding: 8px 16px;">Hủy</button>
+                        <button class="btn btn-primary" onclick="submitBankSettings()" style="padding: 8px 16px;">Lưu Cấu Hình</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript" th:if="${isSuperAdmin}">
+        function openBankSettingsModal() {
+            document.getElementById('bankSettingsModal').classList.add('active');
+            loadBankSettings();
+        }
+
+        function closeBankSettingsModal() {
+            document.getElementById('bankSettingsModal').classList.remove('active');
+        }
+
+        function loadBankSettings() {
+            fetch('/api/pos/bank-setting')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.bankCode) {
+                        document.getElementById('cfgBankCode').value = data.bankCode;
+                        document.getElementById('cfgAccountNumber').value = data.accountNumber;
+                        document.getElementById('cfgAccountHolder').value = data.accountHolder;
+                    } else {
+                        document.getElementById('cfgAccountNumber').value = "";
+                        document.getElementById('cfgAccountHolder').value = "";
+                    }
+                })
+                .catch(err => console.error("Lỗi khi tải cấu hình ngân hàng:", err));
+        }
+
+        function submitBankSettings() {
+            const bankSelect = document.getElementById('cfgBankCode');
+            const bankCode = bankSelect.value;
+            const bankName = bankSelect.options[bankSelect.selectedIndex].text;
+            const accountNumber = document.getElementById('cfgAccountNumber').value.trim();
+            const accountHolder = document.getElementById('cfgAccountHolder').value.trim();
+
+            if (!accountNumber || !accountHolder) {
+                showToast("Vui lòng nhập đầy đủ số tài khoản và tên chủ tài khoản.", "error");
+                return;
+            }
+
+            const url = `/api/pos/bank-setting?bankName=${encodeURIComponent(bankName)}&bankCode=${bankCode}&accountNumber=${encodeURIComponent(accountNumber)}&accountHolder=${encodeURIComponent(accountHolder)}`;
+
+            fetch(url, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
+                    showToast("Lưu cấu hình tài khoản ngân hàng thành công.", "success");
+                    closeBankSettingsModal();
                 })
                 .catch(err => showToast("Lỗi: " + err.message, "error"));
         }

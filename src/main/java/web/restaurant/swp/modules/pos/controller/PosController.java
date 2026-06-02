@@ -62,6 +62,7 @@ public class PosController {
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
     private final OrderService orderService;
+    private final BankSettingRepository bankSettingRepository;
 
     private User getLoggedInUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -205,11 +206,54 @@ public class PosController {
 
     @PostMapping("/api/pos/checkout/confirm")
     @ResponseBody
-    public ResponseEntity<?> finalizePayment(@RequestParam Long sessionId, @RequestParam double amount) {
+    public ResponseEntity<?> finalizePayment(@RequestParam Long sessionId, @RequestParam double amount, @RequestParam(required = false, defaultValue = "CASH") String paymentMethod) {
         try {
-            orderService.confirmPayment(sessionId, amount);
+            orderService.confirmPayment(sessionId, amount, paymentMethod);
             KdsWebSocketHandler.broadcast("ORDER_STATE_CHANGED");
             return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/pos/bank-setting")
+    @ResponseBody
+    public ResponseEntity<?> getBankSetting() {
+        try {
+            List<BankSetting> list = bankSettingRepository.findAll();
+            if (list.isEmpty()) {
+                return ResponseEntity.ok(new HashMap<>());
+            }
+            return ResponseEntity.ok(list.get(0));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/pos/bank-setting")
+    @ResponseBody
+    public ResponseEntity<?> saveBankSetting(@RequestParam String bankName, @RequestParam String bankCode, @RequestParam String accountNumber, @RequestParam String accountHolder) {
+        try {
+            User loggedInUser = getLoggedInUser();
+            if (loggedInUser == null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
+                return ResponseEntity.status(403).body("Không có quyền thực hiện thao tác này.");
+            }
+
+            List<BankSetting> list = bankSettingRepository.findAll();
+            BankSetting setting;
+            if (list.isEmpty()) {
+                setting = new BankSetting();
+            } else {
+                setting = list.get(0);
+            }
+
+            setting.setBankName(bankName);
+            setting.setBankCode(bankCode);
+            setting.setAccountNumber(accountNumber);
+            setting.setAccountHolder(accountHolder);
+
+            setting = bankSettingRepository.save(setting);
+            return ResponseEntity.ok(setting);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

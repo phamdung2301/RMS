@@ -173,8 +173,8 @@
                             <button class="btn btn-secondary" onclick="sendKitchen()">👨‍🍳 Gửi Bếp</button>
                             <button class="btn btn-secondary" onclick="showToast('Tính năng tách hóa đơn. Chọn món cần tách...', 'info')">✂️ Tách Bill</button>
                         </div>
-                        <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="requestCheckout()">
-                            💳 Thanh Toán VNPay QR
+                        <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="openCheckoutModal()">
+                            💳 Thanh Toán
                         </button>
                     </div>
                 </div>
@@ -182,25 +182,72 @@
         </div>
     </div>
 
-    <!-- VNPay QR Modal -->
-    <div class="modal-overlay" id="vnpayModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Thanh Toán VNPay QR Sandbox</h3>
-                <button class="modal-close" onclick="closeVNPayModal()">×</button>
+    <!-- Checkout Modal (Cash / Bank Transfer selection) -->
+    <div class="modal-overlay" id="checkoutModal">
+        <div class="modal-box" style="width: 550px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 20px; font-weight: 700;">💳 Thanh Toán Hóa Đơn</h3>
+                <button class="modal-close" onclick="closeCheckoutModal()">×</button>
             </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;">
-                <p>Quét mã QR Code giả lập dưới đây để hoàn tất thanh toán.</p>
-                <!-- Pre-generated premium visual QR Code placeholder -->
-                <div style="width: 180px; height: 180px; background: white; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=LITEFLOW-PAY-SANDBOX" style="width: 100%; height: 100%;" alt="VNPay QR">
+            
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
+                <!-- Payment Method Toggle Tabs -->
+                <div style="display: flex; gap: 12px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <button class="btn btn-secondary active-tab" id="btnMethodCash" onclick="switchPaymentMethod('CASH')" style="flex: 1; justify-content: center; padding: 10px 0; font-weight: 600; font-size: 14px;">💵 Tiền Mặt</button>
+                    <button class="btn btn-secondary" id="btnMethodBank" onclick="switchPaymentMethod('BANK_TRANSFER')" style="flex: 1; justify-content: center; padding: 10px 0; font-weight: 600; font-size: 14px;">🏦 Chuyển Khoản</button>
                 </div>
-                <div style="font-size: 18px; font-weight: 700; color: var(--color-success);" id="modalPayAmount">
-                    ₫0
+                
+                <!-- CASH METHOD PANEL -->
+                <div id="panelMethodCash" style="display: block;">
+                    <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px;">
+                            <span style="font-size: 14px; color: var(--text-muted);">Tổng tiền cần thanh toán:</span>
+                            <span style="font-size: 22px; font-weight: 800; color: white;" id="cashTotalAmount">₫0</span>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px; display: block;">Tiền khách đưa (₫)</label>
+                            <input type="text" id="cashReceivedInput" class="form-input" placeholder="Ví dụ: 100,000..." oninput="calculateChange()" style="padding: 10px 14px; font-size: 16px; font-weight: 700; width: 100%; text-align: right; background: rgba(0,0,0,0.2); color: #10b981; border: 1px solid var(--border-color); border-radius: 8px;">
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;">
+                            <span style="font-size: 14px; color: var(--text-muted);">Tiền thừa trả khách:</span>
+                            <span style="font-size: 20px; font-weight: 700; color: #f59e0b;" id="cashChangeAmount">₫0</span>
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px 0; font-size: 15px; font-weight: 700;" onclick="confirmCheckout('CASH')">
+                            Xác nhận Thanh toán (Tiền mặt)
+                        </button>
+                    </div>
                 </div>
-                <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="confirmSandboxPayment()">
-                    Xác nhận đã quét (Thành công)
-                </button>
+                
+                <!-- BANK TRANSFER METHOD PANEL -->
+                <div id="panelMethodBank" style="display: none;">
+                    <!-- Configuration Alert -->
+                    <div id="bankConfigAlert" style="display: none; padding: 16px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; text-align: center; color: var(--color-danger); margin-bottom: 12px;">
+                        ⚠️ Tài khoản ngân hàng admin chưa được cấu hình. Vui lòng liên hệ Admin để thiết lập.
+                    </div>
+                    
+                    <div id="bankDetailsContainer" style="display: block;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+                            <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Quét mã VietQR dưới đây để thanh toán chuyển khoản</p>
+                            
+                            <!-- Dynamic VietQR Image -->
+                            <div style="width: 220px; height: 220px; background: white; padding: 12px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+                                <img id="vietQrImg" src="" style="width: 100%; height: 100%; object-fit: contain;" alt="VietQR Code">
+                            </div>
+                            
+                            <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                                <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Ngân hàng:</span><b id="lblBankName" style="color: white;">-</b></div>
+                                <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Số tài khoản:</span><b id="lblAccountNumber" style="color: white; font-family: monospace; font-size: 14px;">-</b></div>
+                                <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Chủ tài khoản:</span><b id="lblAccountHolder" style="color: white;">-</b></div>
+                                <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;"><span style="color: var(--text-muted);">Số tiền:</span><b id="lblTransferAmount" style="color: #10b981; font-size: 15px;">₫0</b></div>
+                                <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Nội dung CK:</span><b id="lblTransferDesc" style="color: #f59e0b; font-family: monospace;">-</b></div>
+                            </div>
+                            
+                            <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px 0; font-size: 15px; font-weight: 700;" onclick="confirmCheckout('BANK_TRANSFER')">
+                                Xác nhận đã nhận Chuyển khoản
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -509,30 +556,137 @@
                 });
         }
 
-        function requestCheckout() {
-            fetch(`/api/pos/checkout/vnpay?sessionId=${currentSessionId}`, { method: 'POST' })
+        let activePaymentMethod = "CASH";
+
+        function openCheckoutModal() {
+            let amountStr = document.getElementById('cartTotal').innerText;
+            checkoutAmount = parseFloat(amountStr.replace(/[^\d]/g, ''));
+            
+            document.getElementById('cashTotalAmount').innerText = amountStr;
+            document.getElementById('cashReceivedInput').value = "";
+            document.getElementById('cashChangeAmount').innerText = "₫0";
+            
+            switchPaymentMethod("CASH");
+            document.getElementById('checkoutModal').classList.add('active');
+            
+            // Pre-load bank settings for Bank Transfer option
+            fetchBankSettings();
+        }
+
+        function closeCheckoutModal() {
+            document.getElementById('checkoutModal').classList.remove('active');
+        }
+
+        function switchPaymentMethod(method) {
+            activePaymentMethod = method;
+            const btnCash = document.getElementById('btnMethodCash');
+            const btnBank = document.getElementById('btnMethodBank');
+            const panelCash = document.getElementById('panelMethodCash');
+            const panelBank = document.getElementById('panelMethodBank');
+
+            if (method === "CASH") {
+                btnCash.classList.add('active-tab');
+                btnBank.classList.remove('active-tab');
+                panelCash.style.display = "block";
+                panelBank.style.display = "none";
+                setTimeout(() => document.getElementById('cashReceivedInput').focus(), 100);
+            } else {
+                btnBank.classList.add('active-tab');
+                btnCash.classList.remove('active-tab');
+                panelCash.style.display = "none";
+                panelBank.style.display = "block";
+            }
+        }
+
+        function calculateChange() {
+            const inputVal = document.getElementById('cashReceivedInput').value.replace(/[^\d]/g, '');
+            if (!inputVal) {
+                document.getElementById('cashChangeAmount').innerText = "₫0";
+                return;
+            }
+            const received = parseFloat(inputVal);
+            // Format input with thousand separators
+            document.getElementById('cashReceivedInput').value = received.toLocaleString();
+            
+            const change = received - checkoutAmount;
+            if (change >= 0) {
+                document.getElementById('cashChangeAmount').innerText = "₫" + change.toLocaleString();
+                document.getElementById('cashChangeAmount').style.color = "#10b981";
+            } else {
+                document.getElementById('cashChangeAmount').innerText = "Thiếu ₫" + Math.abs(change).toLocaleString();
+                document.getElementById('cashChangeAmount').style.color = "#ef4444";
+            }
+        }
+
+        let adminBankConfig = null;
+
+        function fetchBankSettings() {
+            fetch('/api/pos/bank-setting')
                 .then(res => res.json())
                 .then(data => {
-                    let amountStr = document.getElementById('cartTotal').innerText;
-                    checkoutAmount = parseFloat(amountStr.replace(/[^\d]/g, ''));
-                    document.getElementById('modalPayAmount').innerText = amountStr;
-                    document.getElementById('vnpayModal').classList.add('active');
+                    const alertDiv = document.getElementById('bankConfigAlert');
+                    const detailsDiv = document.getElementById('bankDetailsContainer');
+                    if (data && data.bankCode) {
+                        adminBankConfig = data;
+                        alertDiv.style.display = "none";
+                        detailsDiv.style.display = "block";
+                        
+                        // Populate bank details labels
+                        document.getElementById('lblBankName').innerText = data.bankName;
+                        document.getElementById('lblAccountNumber').innerText = data.accountNumber;
+                        document.getElementById('lblAccountHolder').innerText = data.accountHolder;
+                        document.getElementById('lblTransferAmount').innerText = "₫" + checkoutAmount.toLocaleString();
+                        
+                        // Description: LFBAN[tableName]HD[sessionId] (uppercase, no accents, no spaces for VietQR compatibility)
+                        const tableName = document.getElementById('menuTableName').innerText;
+                        const cleanTableName = tableName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").replace(/[^a-zA-Z0-9]/g, "");
+                        const transferDesc = ("LFBAN" + cleanTableName + "HD" + currentSessionId).toUpperCase();
+                        document.getElementById('lblTransferDesc').innerText = transferDesc;
+                        
+                        // Generate VietQR URL
+                        // format: https://img.vietqr.io/image/<BANK_CODE>-<ACCOUNT_NO>-compact.png?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<ACCOUNT_NAME>
+                        const vietQrUrl = `https://img.vietqr.io/image/${data.bankCode}-${data.accountNumber}-compact.png?amount=${checkoutAmount}&addInfo=${encodeURIComponent(transferDesc)}&accountName=${encodeURIComponent(data.accountHolder)}`;
+                        document.getElementById('vietQrImg').src = vietQrUrl;
+                    } else {
+                        adminBankConfig = null;
+                        alertDiv.style.display = "block";
+                        detailsDiv.style.display = "none";
+                    }
+                })
+                .catch(err => {
+                    console.error("Lỗi khi tải cấu hình ngân hàng:", err);
+                    document.getElementById('bankConfigAlert').style.display = "block";
+                    document.getElementById('bankDetailsContainer').style.display = "none";
                 });
         }
 
-        function closeVNPayModal() {
-            document.getElementById('vnpayModal').classList.remove('active');
-        }
+        function confirmCheckout(method) {
+            if (method === "CASH") {
+                const receivedVal = document.getElementById('cashReceivedInput').value.replace(/[^\d]/g, '');
+                const received = receivedVal ? parseFloat(receivedVal) : 0;
+                if (received < checkoutAmount) {
+                    showToast("Số tiền khách đưa chưa đủ để thanh toán.", "error");
+                    return;
+                }
+            } else if (method === "BANK_TRANSFER") {
+                if (!adminBankConfig) {
+                    showToast("Chưa có cấu hình ngân hàng của admin. Không thể thanh toán chuyển khoản.", "error");
+                    return;
+                }
+            }
 
-        function confirmSandboxPayment() {
-            fetch(`/api/pos/checkout/confirm?sessionId=${currentSessionId}&amount=${checkoutAmount}`, { method: 'POST' })
-                .then(() => {
+            fetch(`/api/pos/checkout/confirm?sessionId=${currentSessionId}&amount=${checkoutAmount}&paymentMethod=${method}`, { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(t => { throw new Error(t); });
+                    }
                     showToast("Thanh toán thành công. Bàn được giải phóng.", "success");
-                    closeVNPayModal();
+                    closeCheckoutModal();
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);
-                });
+                })
+                .catch(err => showToast("Lỗi: " + err.message, "error"));
         }
 
         let roomsCache = [];

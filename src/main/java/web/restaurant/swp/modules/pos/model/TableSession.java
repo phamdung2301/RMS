@@ -60,4 +60,7 @@ public class TableSession {
 
     @Column(name = "payment_status", nullable = false)
     private String paymentStatus = "UNPAID"; // UNPAID, PAID
+
+    @Column(name = "payment_method")
+    private String paymentMethod; // CASH, BANK_TRANSFER
 }
