@@ -24,6 +24,9 @@
                     <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -37,9 +40,22 @@
             <div class="top-bar">
                 <div>
                     <h2 class="page-title">Quản Lý Đặt Hàng</h2>
-                    <p style="color: var(--text-muted); font-size: 14px;">Danh sách các đơn đặt hàng nhà cung cấp (PO)</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 4px 8px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            <option th:each="b : ${branches}" 
+                                    th:value="${b.branchId}" 
+                                    th:text="${'Chi nhánh: ' + b.name}" 
+                                    th:selected="${b.branchId == activeBranchId}">
+                                Chi nhánh: Trung Tâm
+                            </option>
+                        </select>
+                        <span th:if="${!canSwitchBranch}" style="color: var(--text-muted); font-size: 14px;" 
+                              th:text="${'Chi nhánh hiện tại: ' + (activeBranchName != null ? activeBranchName : 'Toàn hệ thống')}">
+                            Chi nhánh hiện tại: Trung Tâm
+                        </span>
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="showToast('Đang hiển thị form tạo PO mới...', 'info')">
+                <button class="btn btn-primary" onclick="openCreatePoModal()">
                     ➕ Tạo PO Mới
                 </button>
             </div>
@@ -199,7 +215,7 @@
         </div>
     </div>
 
-    <script>
+    <script th:inline="javascript">
         let activePoId = null;
         let activePoItems = [];
 
@@ -391,6 +407,243 @@
             })
             .catch(err => showToast("Lỗi hệ thống: " + err, "error"));
         }
+
+        const rawInventoryItems = [
+            /*[# th:each="item : ${inventoryItems}"]*/
+            { id: [[${item.id}]], name: [[${item.name}]], sku: [[${item.sku}]], unit: [[${item.unit}]] },
+            /*[/]*/
+        ];
+
+        function openCreatePoModal() {
+            document.getElementById('createPoModal').classList.add('active');
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('poDeadline').value = today;
+            document.getElementById('poDeadline').min = today;
+            
+            // Start with one row
+            document.getElementById('createPoItemsBody').innerHTML = '';
+            addPoItemRow();
+        }
+
+        function closeCreatePoModal() {
+            document.getElementById('createPoModal').classList.remove('active');
+            document.getElementById('createPoForm').reset();
+            document.getElementById('createPoItemsBody').innerHTML = '';
+        }
+
+        function addPoItemRow() {
+            const tbody = document.getElementById('createPoItemsBody');
+            const rowId = 'po-row-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+
+            // Generate options
+            let optionsHtml = '<option value="" disabled selected>-- Chọn nguyên liệu --</option>';
+            rawInventoryItems.forEach(item => {
+                optionsHtml += `<option value="${item.id}" data-unit="${item.unit}">${item.sku} - ${item.name}</option>`;
+            });
+
+            tr.innerHTML = `
+                <td>
+                    <select class="form-input po-item-select" required style="width: 100%; box-sizing: border-box; background: var(--bg-surface); color: white;" onchange="updateRowUnit('${rowId}')">
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td style="vertical-align: middle;">
+                    <span class="po-item-unit" style="color: var(--text-muted); font-weight: 500;">-</span>
+                </td>
+                <td>
+                    <input type="number" class="form-input po-item-qty" required min="0.01" step="any" placeholder="Số lượng" style="width: 100%; box-sizing: border-box; text-align: right; color: white;">
+                </td>
+                <td>
+                    <input type="number" class="form-input po-item-price" required min="0" step="any" placeholder="Đơn giá" style="width: 100%; box-sizing: border-box; text-align: right; color: white;">
+                </td>
+                <td style="text-align: center; vertical-align: middle;">
+                    <button type="button" class="btn btn-danger" onclick="removePoItemRow('${rowId}')" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; display: inline-flex;">❌</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function updateRowUnit(rowId) {
+            const row = document.getElementById(rowId);
+            const select = row.querySelector('.po-item-select');
+            const selectedOpt = select.options[select.selectedIndex];
+            const unitSpan = row.querySelector('.po-item-unit');
+            const unit = selectedOpt.getAttribute('data-unit') || '-';
+            unitSpan.innerText = unit;
+        }
+
+        function removePoItemRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row) {
+                row.remove();
+            }
+        }
+
+        function submitCreatePo(event) {
+            event.preventDefault();
+            
+            const supplierSelect = document.getElementById('poSupplier');
+            if (!supplierSelect.value) {
+                showToast("Vui lòng chọn nhà cung cấp!", "warning");
+                return;
+            }
+            const supplierId = parseInt(supplierSelect.value);
+            const deadline = document.getElementById('poDeadline').value;
+            
+            const itemIds = [];
+            const quantities = [];
+            const unitPrices = [];
+            
+            const rows = document.querySelectorAll('#createPoItemsBody tr');
+            if (rows.length === 0) {
+                showToast("Vui lòng thêm ít nhất một nguyên liệu!", "warning");
+                return;
+            }
+            
+            let hasDuplicate = false;
+            let invalidItem = false;
+            rows.forEach(row => {
+                const select = row.querySelector('.po-item-select');
+                const qtyInput = row.querySelector('.po-item-qty');
+                const priceInput = row.querySelector('.po-item-price');
+                
+                if (!select.value) {
+                    invalidItem = true;
+                    return;
+                }
+                const itemId = parseInt(select.value);
+                const qty = parseFloat(qtyInput.value);
+                const price = parseFloat(priceInput.value);
+                
+                if (itemIds.includes(itemId)) {
+                    hasDuplicate = true;
+                }
+                
+                itemIds.push(itemId);
+                quantities.push(qty);
+                unitPrices.push(price);
+            });
+            
+            if (invalidItem) {
+                showToast("Vui lòng chọn nguyên liệu hợp lệ cho mỗi dòng!", "warning");
+                return;
+            }
+            
+            if (hasDuplicate) {
+                showToast("Vui lòng không chọn trùng nguyên liệu trong các dòng!", "warning");
+                return;
+            }
+            
+            const payload = {
+                supplierId: supplierId,
+                deliveryDeadline: deadline,
+                itemIds: itemIds,
+                quantities: quantities,
+                unitPrices: unitPrices
+            };
+            
+            fetch('/api/procurement/po/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Tạo đơn đặt hàng PO thành công!", "success");
+                    closeCreatePoModal();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi tạo PO: " + text, "error");
+                }
+            })
+            .catch(err => {
+                showToast("Lỗi kết nối máy chủ!", "error");
+                console.error(err);
+            });
+        }
+    </script>
+
+    <!-- Create PO Modal -->
+    <div id="createPoModal" class="modal-overlay">
+        <div class="modal-box" style="width: 800px; max-width: 95vw;">
+            <div class="modal-header">
+                <h3 style="font-size: 20px; font-weight: 700; color: white;">➕ Tạo Đơn Đặt Hàng PO Mới</h3>
+                <button class="modal-close" onclick="closeCreatePoModal()">&times;</button>
+            </div>
+            <form id="createPoForm" onsubmit="submitCreatePo(event)">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: white;">Chọn Nhà Cung Cấp</label>
+                        <select id="poSupplier" class="form-input" required style="width: 100%; box-sizing: border-box; background: var(--bg-surface); color: white;">
+                            <option value="" disabled selected>-- Chọn nhà cung cấp --</option>
+                            <option th:each="s : ${suppliers}" th:value="${s.id}" th:text="${s.name}">Nhà cung cấp A</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: white;">Hạn Giao Hàng (Deadline)</label>
+                        <input type="date" id="poDeadline" class="form-input" required style="width: 100%; box-sizing: border-box; color: white;">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 style="font-size: 16px; font-weight: 600; margin: 0; color: white;">Nguyên Liệu Đặt Hàng</h4>
+                    <button type="button" class="btn btn-secondary" onclick="addPoItemRow()" style="padding: 6px 12px; font-size: 13px;">
+                        ➕ Thêm dòng
+                    </button>
+                </div>
+
+                <div class="table-responsive" style="max-height: 250px; overflow-y: auto; margin-bottom: 24px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    <table class="premium-table" style="margin: 0; font-size: 14px;">
+                        <thead>
+                            <tr>
+                                <th>Nguyên Liệu</th>
+                                <th style="width: 120px;">Đơn Vị</th>
+                                <th style="width: 120px; text-align: right;">Số Lượng</th>
+                                <th style="width: 150px; text-align: right;">Đơn Giá (đ)</th>
+                                <th style="width: 80px; text-align: center;">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="createPoItemsBody">
+                            <!-- Rows added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreatePoModal()">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Tạo Đơn PO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>

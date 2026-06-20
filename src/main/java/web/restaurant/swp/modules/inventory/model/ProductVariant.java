@@ -24,13 +24,14 @@ import web.restaurant.swp.modules.promotion.service.*;
 import web.restaurant.swp.modules.analytics.service.*;
 import web.restaurant.swp.modules.branch.model.*;
 import web.restaurant.swp.modules.branch.repository.*;
+import web.restaurant.swp.modules.tenant.model.*;
 
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "product_variants")
+@Table(name = "product_variants", uniqueConstraints = @UniqueConstraint(columnNames = {"sku", "product_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -53,7 +54,7 @@ public class ProductVariant {
     @Column(name = "original_price", nullable = false)
     private Double originalPrice; // Cost price
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String sku; // Unique stock keeping unit
 
     @Column(name = "branch_id", length = 36)

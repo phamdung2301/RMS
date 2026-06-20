@@ -53,6 +53,7 @@ public class ProcurementController {
     private final SupplierRepository supplierRepository;
     private final UserRepository userRepository;
     private final ProcurementService procurementService;
+    private final InventoryItemRepository inventoryItemRepository;
 
     private User getLoggedInUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -61,16 +62,21 @@ public class ProcurementController {
     }
 
     private String getActiveBranchId() {
+        return web.restaurant.swp.config.BranchContext.getActiveBranchId(getLoggedInUser());
+    }
+
+    private String getActiveTenantId() {
         User user = getLoggedInUser();
-        if (user != null && user.getBranch() != null) {
-            return user.getBranch().getBranchId();
+        if (user != null && user.getTenant() != null) {
+            return user.getTenant().getTenantId();
         }
-        return "branch-1";
+        return "tenant-1";
     }
 
     @GetMapping("/procurement")
     public String procurement(Model model) {
         String branchId = getActiveBranchId();
+        String tenantId = getActiveTenantId();
         List<PurchaseOrder> pos = purchaseOrderRepository.findByBranchBranchId(branchId);
         
         double totalAmount = pos.stream().mapToDouble(PurchaseOrder::getTotalAmount).sum();
@@ -79,7 +85,8 @@ public class ProcurementController {
         long overduePo = pos.stream().filter(po -> "SENT".equalsIgnoreCase(po.getStatus()) && po.getDeliveryDeadline() != null && po.getDeliveryDeadline().isBefore(LocalDate.now())).count();
         
         model.addAttribute("purchaseOrders", pos);
-        model.addAttribute("suppliers", supplierRepository.findAll());
+        model.addAttribute("suppliers", supplierRepository.findByTenantTenantId(tenantId));
+        model.addAttribute("inventoryItems", inventoryItemRepository.findByTenantTenantId(tenantId));
         
         model.addAttribute("totalPoAmount", totalAmount);
         model.addAttribute("pendingReceipt", pendingReceipt);
@@ -178,6 +185,34 @@ public class ProcurementController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @PostMapping("/api/procurement/po/create")
+    @ResponseBody
+    public ResponseEntity<?> createPurchaseOrder(@RequestBody PoCreateRequest request) {
+        try {
+            String branchId = getActiveBranchId();
+            PurchaseOrder po = procurementService.createPurchaseOrder(
+                branchId,
+                request.getSupplierId(),
+                request.getDeliveryDeadline(),
+                request.getItemIds(),
+                request.getQuantities(),
+                request.getUnitPrices()
+            );
+            return ResponseEntity.ok(po);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @lombok.Data
+    public static class PoCreateRequest {
+        private Long supplierId;
+        private LocalDate deliveryDeadline;
+        private List<Long> itemIds;
+        private List<Double> quantities;
+        private List<Double> unitPrices;
     }
 
     @lombok.Data

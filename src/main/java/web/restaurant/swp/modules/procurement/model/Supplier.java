@@ -24,13 +24,14 @@ import web.restaurant.swp.modules.promotion.service.*;
 import web.restaurant.swp.modules.analytics.service.*;
 import web.restaurant.swp.modules.branch.model.*;
 import web.restaurant.swp.modules.branch.repository.*;
+import web.restaurant.swp.modules.tenant.model.*;
 
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "suppliers")
+@Table(name = "suppliers", uniqueConstraints = @UniqueConstraint(columnNames = {"code", "tenant_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -40,7 +41,7 @@ public class Supplier {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String code; // Supplier code (e.g. SUP001)
 
     @Column(nullable = false)
@@ -51,4 +52,8 @@ public class Supplier {
 
     private String phone;
     private String address;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id")
+    private Tenant tenant;
 }

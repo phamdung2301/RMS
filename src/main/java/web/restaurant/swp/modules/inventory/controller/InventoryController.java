@@ -55,6 +55,9 @@ public class InventoryController {
     private final InventoryItemRepository inventoryItemRepository;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BranchRepository branchRepository;
+    private final BranchTransferRepository branchTransferRepository;
+    private final BranchTransferItemRepository branchTransferItemRepository;
 
     private User getLoggedInUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -63,23 +66,39 @@ public class InventoryController {
     }
 
     private String getActiveBranchId() {
+        return web.restaurant.swp.config.BranchContext.getActiveBranchId(getLoggedInUser());
+    }
+
+    private String getActiveTenantId() {
         User user = getLoggedInUser();
-        if (user != null && user.getBranch() != null) {
-            return user.getBranch().getBranchId();
+        if (user != null && user.getTenant() != null) {
+            return user.getTenant().getTenantId();
         }
-        return "branch-1";
+        return "tenant-1";
     }
 
     @GetMapping("/inventory")
     public String inventory(Model model) {
         String branchId = getActiveBranchId();
+        String tenantId = getActiveTenantId();
         model.addAttribute("inventoryStocks", branchInventoryRepository.findByBranchBranchId(branchId));
         model.addAttribute("lowStockItems", inventoryService.getLowStockItems(branchId));
-        model.addAttribute("productStocks", productStockRepository.findAll());
-        model.addAttribute("variants", productVariantRepository.findAll());
-        model.addAttribute("inventoryItems", inventoryItemRepository.findAll());
-        model.addAttribute("products", productRepository.findAll());
-        model.addAttribute("categories", categoryRepository.findAll());
+        model.addAttribute("productStocks", productStockRepository.findByVariantProductTenantTenantId(tenantId));
+        model.addAttribute("variants", productVariantRepository.findByProductTenantTenantId(tenantId));
+        model.addAttribute("inventoryItems", inventoryItemRepository.findByTenantTenantId(tenantId));
+        model.addAttribute("products", productRepository.findByTenantTenantId(tenantId));
+        model.addAttribute("categories", categoryRepository.findByTenantTenantId(tenantId));
+        
+        // Add branch transfers
+        model.addAttribute("transfers", branchTransferRepository.findBySourceBranchBranchIdOrTargetBranchBranchId(branchId, branchId));
+        
+        // Add other branches of same tenant for transfer target/source
+        List<Branch> otherBranches = branchRepository.findByTenantTenantIdAndIsActiveTrue(tenantId).stream()
+                .filter(b -> !b.getBranchId().equals(branchId))
+                .collect(java.util.stream.Collectors.toList());
+        model.addAttribute("otherBranches", otherBranches);
+        model.addAttribute("activeBranchId", branchId);
+        
         return "inventory";
     }
 
@@ -140,6 +159,130 @@ public class InventoryController {
             return ResponseEntity.ok("Successfully deleted recipe portion");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/inventory/recipes/variant/{variantId}")
+    @ResponseBody
+    public ResponseEntity<?> getRecipesByVariant(@PathVariable Long variantId) {
+        try {
+            return ResponseEntity.ok(productStockRepository.findByVariantId(variantId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/inventory/recipes/bulk")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> saveRecipeBulk(@RequestBody RecipeBulkRequest request) {
+        try {
+            ProductVariant variant = productVariantRepository.findById(request.getVariantId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy món ăn"));
+            
+            // Delete existing product stocks for this variant
+            List<ProductStock> existing = productStockRepository.findByVariantId(request.getVariantId());
+            productStockRepository.deleteAll(existing);
+            
+            // Create new ones
+            if (request.getPortions() != null) {
+                for (RecipePortion portion : request.getPortions()) {
+                    if (portion.getItemId() == null || portion.getQuantityNeeded() == null || portion.getQuantityNeeded() <= 0) {
+                        continue;
+                    }
+                    InventoryItem item = inventoryItemRepository.findById(portion.getItemId())
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy nguyên liệu có ID: " + portion.getItemId()));
+                    
+                    ProductStock ps = ProductStock.builder()
+                            .variant(variant)
+                            .item(item)
+                            .quantityNeeded(portion.getQuantityNeeded())
+                            .build();
+                    productStockRepository.save(ps);
+                }
+            }
+            return ResponseEntity.ok("Successfully saved recipe portions");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/inventory/items")
+    @ResponseBody
+    public ResponseEntity<?> saveInventoryItem(@RequestBody InventoryItemRequest request) {
+        try {
+            if (request.getSku() == null || request.getSku().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Mã SKU không được trống");
+            }
+            if (request.getName() == null || request.getName().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Tên nguyên liệu không được trống");
+            }
+            if (request.getUnit() == null || request.getUnit().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Đơn vị tính không được trống");
+            }
+            
+            InventoryItem item;
+            if (request.getId() != null) {
+                item = inventoryItemRepository.findById(request.getId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy nguyên liệu"));
+                item.setSku(request.getSku().trim());
+                item.setName(request.getName().trim());
+                item.setUnit(request.getUnit().trim());
+                item.setMinimumThreshold(request.getMinimumThreshold() != null ? request.getMinimumThreshold() : 0.0);
+            } else {
+                // Check SKU
+                if (inventoryItemRepository.findBySku(request.getSku().trim()).isPresent()) {
+                    throw new RuntimeException("Mã SKU nguyên liệu đã tồn tại!");
+                }
+                item = InventoryItem.builder()
+                        .sku(request.getSku().trim())
+                        .name(request.getName().trim())
+                        .unit(request.getUnit().trim())
+                        .minimumThreshold(request.getMinimumThreshold() != null ? request.getMinimumThreshold() : 0.0)
+                        .build();
+            }
+            inventoryItemRepository.save(item);
+            
+            // Proactively create BranchInventory for the current branch
+            String activeBranchId = getActiveBranchId();
+            if (branchInventoryRepository.findByBranchBranchIdAndItemId(activeBranchId, item.getId()).isEmpty()) {
+                Branch branch = branchRepository.findById(activeBranchId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh"));
+                BranchInventory binv = BranchInventory.builder()
+                        .branch(branch)
+                        .item(item)
+                        .quantity(0.0)
+                        .reorderPoint(item.getMinimumThreshold())
+                        .build();
+                branchInventoryRepository.save(binv);
+            }
+            
+            return ResponseEntity.ok("Successfully saved inventory item");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/api/inventory/items/{id}")
+    @ResponseBody
+    public ResponseEntity<?> deleteInventoryItem(@PathVariable Long id) {
+        try {
+            // Delete related product stocks (recipes) first to avoid constraint violation
+            List<ProductStock> productStocks = productStockRepository.findAll().stream()
+                    .filter(ps -> ps.getItem().getId().equals(id))
+                    .toList();
+            productStockRepository.deleteAll(productStocks);
+
+            // Delete related branch inventory
+            List<BranchInventory> branchInventories = branchInventoryRepository.findAll().stream()
+                    .filter(bi -> bi.getItem().getId().equals(id))
+                    .toList();
+            branchInventoryRepository.deleteAll(branchInventories);
+
+            inventoryItemRepository.deleteById(id);
+            return ResponseEntity.ok("Successfully deleted inventory item");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Không thể xóa nguyên liệu này: " + e.getMessage());
         }
     }
 
@@ -289,5 +432,121 @@ public class InventoryController {
         private Long variantId;
         private Long itemId;
         private Double quantityNeeded;
+    }
+
+    @lombok.Data
+    public static class RecipeBulkRequest {
+        private Long variantId;
+        private List<RecipePortion> portions;
+    }
+
+    @lombok.Data
+    public static class RecipePortion {
+        private Long itemId;
+        private Double quantityNeeded;
+    }
+
+    @lombok.Data
+    public static class InventoryItemRequest {
+        private Long id;
+        private String sku;
+        private String name;
+        private String unit;
+        private Double minimumThreshold;
+    }
+
+    @PostMapping("/api/inventory/transfer/create")
+    @ResponseBody
+    public ResponseEntity<?> createTransfer(@RequestBody TransferRequest request) {
+        try {
+            User loggedInUser = getLoggedInUser();
+            if (loggedInUser == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            String targetBranchId = getActiveBranchId();
+            String sourceBranchId = request.getSourceBranchId();
+            
+            if (sourceBranchId == null || sourceBranchId.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Vui lòng chọn chi nhánh gửi");
+            }
+            if (request.getItemIds() == null || request.getItemIds().isEmpty() || request.getQuantities() == null || request.getQuantities().isEmpty()) {
+                return ResponseEntity.badRequest().body("Vui lòng thêm ít nhất một nguyên liệu");
+            }
+            
+            BranchTransfer transfer = inventoryService.createTransferRequest(
+                sourceBranchId,
+                targetBranchId,
+                request.getItemIds(),
+                request.getQuantities()
+            );
+            return ResponseEntity.ok(transfer);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Không thể tạo yêu cầu điều chuyển: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/inventory/transfer/approve/{id}")
+    @ResponseBody
+    public ResponseEntity<?> approveTransfer(@PathVariable Long id) {
+        try {
+            User loggedInUser = getLoggedInUser();
+            if (loggedInUser == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            
+            BranchTransfer transfer = branchTransferRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy yêu cầu điều chuyển"));
+            
+            // Validate that logged-in user belongs to the source branch of the transfer, or has ADMIN role
+            boolean isAdmin = loggedInUser.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
+            if (!isAdmin && (loggedInUser.getBranch() == null || !loggedInUser.getBranch().getBranchId().equals(transfer.getSourceBranch().getBranchId()))) {
+                return ResponseEntity.status(403).body("Chỉ chi nhánh nguồn (gửi hàng) mới có quyền phê duyệt yêu cầu này.");
+            }
+            
+            inventoryService.approveAndExecuteTransfer(id);
+            return ResponseEntity.ok("Đã phê duyệt và điều chuyển kho thành công");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Không thể phê duyệt yêu cầu: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/inventory/transfer/details/{id}")
+    @ResponseBody
+    public ResponseEntity<?> getTransferDetails(@PathVariable Long id) {
+        try {
+            BranchTransfer transfer = branchTransferRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy yêu cầu điều chuyển"));
+            List<BranchTransferItem> items = branchTransferItemRepository.findByTransferId(id);
+            
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("id", transfer.getId());
+            response.put("sourceBranchName", transfer.getSourceBranch().getName());
+            response.put("targetBranchName", transfer.getTargetBranch().getName());
+            response.put("status", transfer.getStatus());
+            response.put("requestDate", transfer.getRequestDate().toString());
+            response.put("approveDate", transfer.getApproveDate() != null ? transfer.getApproveDate().toString() : "");
+            
+            List<java.util.Map<String, Object>> itemDetails = new java.util.ArrayList<>();
+            for (BranchTransferItem item : items) {
+                java.util.Map<String, Object> iMap = new java.util.HashMap<>();
+                iMap.put("itemId", item.getItem().getId());
+                iMap.put("sku", item.getItem().getSku());
+                iMap.put("name", item.getItem().getName());
+                iMap.put("unit", item.getItem().getUnit());
+                iMap.put("quantity", item.getQuantity());
+                itemDetails.add(iMap);
+            }
+            response.put("items", itemDetails);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Không thể tải chi tiết yêu cầu: " + e.getMessage());
+        }
+    }
+
+    @lombok.Data
+    public static class TransferRequest {
+        private String sourceBranchId;
+        private List<Long> itemIds;
+        private List<Double> quantities;
     }
 }

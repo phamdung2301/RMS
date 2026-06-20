@@ -312,6 +312,12 @@ public class AuthService {
     // REQ-AUTH-07: Security Audit Logging (Read-only creation helper)
     @Transactional
     public void logAudit(User user, String action, String objectType, String objectId, String description, String ipAddress) {
+        String branchId = (user != null && user.getBranch() != null) ? user.getBranch().getBranchId() : null;
+        logAudit(user, action, objectType, objectId, description, ipAddress, branchId);
+    }
+
+    @Transactional
+    public void logAudit(User user, String action, String objectType, String objectId, String description, String ipAddress, String branchId) {
         AuditLog log = AuditLog.builder()
                 .user(user)
                 .userName(user != null ? user.getName() : "System")
@@ -320,6 +326,7 @@ public class AuthService {
                 .objectId(objectId)
                 .description(description)
                 .ipAddress(ipAddress)
+                .branchId(branchId)
                 .createdAt(LocalDateTime.now())
                 .build();
         auditLogRepository.save(log);

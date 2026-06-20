@@ -60,6 +60,9 @@ public class HRController {
     private final ShiftTemplateRepository shiftTemplateRepository;
     private final UserRepository userRepository;
     private final HRService hrService;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
+    private final BranchRepository branchRepository;
 
     private User getLoggedInUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -68,16 +71,21 @@ public class HRController {
     }
 
     private String getActiveBranchId() {
+        return web.restaurant.swp.config.BranchContext.getActiveBranchId(getLoggedInUser());
+    }
+
+    private String getActiveTenantId() {
         User user = getLoggedInUser();
-        if (user != null && user.getBranch() != null) {
-            return user.getBranch().getBranchId();
+        if (user != null && user.getTenant() != null) {
+            return user.getTenant().getTenantId();
         }
-        return "branch-1";
+        return "tenant-1";
     }
 
     @GetMapping("/schedule")
     public String schedule(Model model) {
         String branchId = getActiveBranchId();
+        String tenantId = getActiveTenantId();
         model.addAttribute("employees", employeeRepository.findByBranchBranchId(branchId));
         
         LocalDate startOfWeek = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
@@ -92,7 +100,7 @@ public class HRController {
                 .findByEmployeeBranchBranchIdAndDateBetween(branchId, startOfWeek, startOfWeek.plusDays(6));
         model.addAttribute("assignments", assignments);
 
-        model.addAttribute("shiftTemplates", shiftTemplateRepository.findAll());
+        model.addAttribute("shiftTemplates", shiftTemplateRepository.findByTenantTenantId(tenantId));
 
         return "schedule";
     }
@@ -335,6 +343,77 @@ public class HRController {
         }
     }
 
+    @PostMapping("/api/employee/leave-request")
+    @ResponseBody
+    public ResponseEntity<?> submitLeaveRequest(@RequestBody LeaveRequestSubmit request) {
+        try {
+            User user = getLoggedInUser();
+            if (user == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            Employee employee = employeeRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Tài khoản chưa được liên kết với hồ sơ nhân sự"));
+
+            if (request.getStartDate() == null || request.getEndDate() == null) {
+                throw new RuntimeException("Vui lòng nhập ngày bắt đầu và kết thúc");
+            }
+            if (request.getStartDate().isAfter(request.getEndDate())) {
+                throw new RuntimeException("Ngày bắt đầu không được sau ngày kết thúc");
+            }
+            
+            LeaveRequest leave = LeaveRequest.builder()
+                    .employee(employee)
+                    .startDate(request.getStartDate())
+                    .endDate(request.getEndDate())
+                    .leaveType(request.getLeaveType() != null ? request.getLeaveType().trim() : "ANNUAL")
+                    .reason(request.getReason() != null ? request.getReason().trim() : "")
+                    .status("PENDING")
+                    .build();
+            
+            leaveRequestRepository.save(leave);
+            return ResponseEntity.ok("Successfully submitted leave request");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/employee/forgot-clock-request")
+    @ResponseBody
+    public ResponseEntity<?> submitForgotClockRequest(@RequestBody ForgotClockSubmit request) {
+        try {
+            User user = getLoggedInUser();
+            if (user == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            Employee employee = employeeRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Tài khoản chưa được liên kết với hồ sơ nhân sự"));
+
+            if (request.getDate() == null) {
+                throw new RuntimeException("Vui lòng nhập ngày cần bổ sung công");
+            }
+            if (request.getClockType() == null || request.getClockType().trim().isEmpty()) {
+                throw new RuntimeException("Vui lòng chọn loại check-in hoặc check-out");
+            }
+            if (request.getTimeProposed() == null || request.getTimeProposed().trim().isEmpty()) {
+                throw new RuntimeException("Vui lòng nhập giờ đề nghị bổ sung");
+            }
+            
+            ForgotClockRequest clockReq = ForgotClockRequest.builder()
+                    .employee(employee)
+                    .date(request.getDate())
+                    .clockType(request.getClockType().trim().toUpperCase())
+                    .timeProposed(request.getTimeProposed().trim())
+                    .reason(request.getReason() != null ? request.getReason().trim() : "")
+                    .status("PENDING")
+                    .build();
+            
+            forgotClockRequestRepository.save(clockReq);
+            return ResponseEntity.ok("Successfully submitted forgot clock request");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/api/hr/shifts")
     @ResponseBody
     public ResponseEntity<?> getShiftTemplates() {
@@ -392,5 +471,305 @@ public class HRController {
         private String startTime;
         private String endTime;
         private Double durationHours;
+    }
+
+    @lombok.Data
+    public static class LeaveRequestSubmit {
+        private LocalDate startDate;
+        private LocalDate endDate;
+        private String leaveType;
+        private String reason;
+    }
+
+    @lombok.Data
+    public static class ForgotClockSubmit {
+        private LocalDate date;
+        private String clockType;
+        private String timeProposed;
+        private String reason;
+    }
+
+    @GetMapping("/hr-management")
+    public String hrManagement(Model model) {
+        User user = getLoggedInUser();
+        if (user == null) {
+            return "redirect:/login";
+        }
+        
+        List<Employee> employees;
+        List<LeaveRequest> leaveRequests;
+        List<ForgotClockRequest> forgotRequests;
+        List<Branch> branches = branchRepository.findAll();
+        List<Role> roles = roleRepository.findAll();
+
+        String activeBranchId = getActiveBranchId();
+        employees = employeeRepository.findByBranchBranchId(activeBranchId);
+        leaveRequests = leaveRequestRepository.findByEmployeeBranchBranchId(activeBranchId);
+        forgotRequests = forgotClockRequestRepository.findByEmployeeBranchBranchId(activeBranchId);
+
+        model.addAttribute("employees", employees);
+        model.addAttribute("leaveRequests", leaveRequests);
+        model.addAttribute("forgotRequests", forgotRequests);
+        model.addAttribute("branches", branches);
+        model.addAttribute("roles", roles);
+        model.addAttribute("currentUser", user);
+
+        return "hr_management";
+    }
+
+    @PostMapping("/api/hr/employees/add")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> addEmployee(
+            @RequestParam String name,
+            @RequestParam String email,
+            @RequestParam String password,
+            @RequestParam Long roleId,
+            @RequestParam String department,
+            @RequestParam String title,
+            @RequestParam Double baseSalary,
+            @RequestParam String salaryType,
+            @RequestParam(required = false) String branchId) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+
+            if (userRepository.findByEmail(email).isPresent()) {
+                return ResponseEntity.badRequest().body("Email đã tồn tại trong hệ thống.");
+            }
+
+            Branch branch = null;
+            if (web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn)) {
+                String targetBranchId = (branchId != null && !branchId.trim().isEmpty()) ? branchId : getActiveBranchId();
+                branch = branchRepository.findById(targetBranchId).orElse(null);
+            } else if (loggedIn.getBranch() != null) {
+                branch = loggedIn.getBranch();
+            }
+
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò."));
+
+            User newUser = User.builder()
+                    .name(name)
+                    .email(email)
+                    .password(passwordEncoder.encode(password))
+                    .isActive(true)
+                    .branch(branch)
+                    .tenant(loggedIn.getTenant())
+                    .roles(java.util.Set.of(role))
+                    .build();
+
+            newUser = userRepository.save(newUser);
+
+            Employee employee = Employee.builder()
+                    .user(newUser)
+                    .department(department)
+                    .title(title)
+                    .hireDate(LocalDate.now())
+                    .baseSalary(baseSalary)
+                    .salaryType(salaryType)
+                    .branch(branch)
+                    .build();
+
+            employeeRepository.save(employee);
+            return ResponseEntity.ok("Thêm nhân viên thành công.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/employees/update")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> updateEmployee(
+            @RequestParam Long id,
+            @RequestParam String name,
+            @RequestParam String email,
+            @RequestParam(required = false) String password,
+            @RequestParam Long roleId,
+            @RequestParam String department,
+            @RequestParam String title,
+            @RequestParam Double baseSalary,
+            @RequestParam String salaryType,
+            @RequestParam(required = false) String branchId) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+
+            Employee employee = employeeRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên."));
+
+            User user = employee.getUser();
+            
+            if (!user.getEmail().equalsIgnoreCase(email) && userRepository.findByEmail(email).isPresent()) {
+                return ResponseEntity.badRequest().body("Email đã tồn tại.");
+            }
+
+            Branch branch = null;
+            if (web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn)) {
+                String targetBranchId = (branchId != null && !branchId.trim().isEmpty()) ? branchId : getActiveBranchId();
+                branch = branchRepository.findById(targetBranchId).orElse(null);
+            } else if (loggedIn.getBranch() != null) {
+                branch = loggedIn.getBranch();
+            }
+
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò."));
+
+            user.setName(name);
+            user.setEmail(email);
+            if (password != null && !password.trim().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(password));
+            }
+            user.setBranch(branch);
+            user.setRoles(java.util.Set.of(role));
+            userRepository.save(user);
+
+            employee.setDepartment(department);
+            employee.setTitle(title);
+            employee.setBaseSalary(baseSalary);
+            employee.setSalaryType(salaryType);
+            employee.setBranch(branch);
+            employeeRepository.save(employee);
+
+            return ResponseEntity.ok("Cập nhật nhân viên thành công.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/employees/delete/{id}")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> deleteEmployee(@PathVariable Long id) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+
+            Employee employee = employeeRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên."));
+
+            User user = employee.getUser();
+            
+            if (loggedIn.getId().equals(user.getId())) {
+                return ResponseEntity.badRequest().body("Bạn không thể tự xóa tài khoản của chính mình!");
+            }
+
+            if (!web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn) && loggedIn.getBranch() != null && (employee.getBranch() == null || !employee.getBranch().getBranchId().equals(loggedIn.getBranch().getBranchId()))) {
+                return ResponseEntity.status(403).body("Không có quyền xóa nhân viên của chi nhánh khác.");
+            }
+
+            employeeShiftAssignmentRepository.deleteByEmployeeId(id);
+            employeeAttendanceRepository.deleteByEmployeeId(id);
+            leaveRequestRepository.deleteByEmployeeId(id);
+            forgotClockRequestRepository.deleteByEmployeeId(id);
+            
+            employeeRepository.delete(employee);
+            userRepository.delete(user);
+
+            return ResponseEntity.ok(java.util.Map.of("message", "Xóa nhân viên thành công."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/leave-requests/approve/{id}")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> approveLeaveRequest(@PathVariable Long id) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            LeaveRequest req = leaveRequestRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn xin nghỉ phép"));
+            
+            if (!web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn) && loggedIn.getBranch() != null && (req.getEmployee().getBranch() == null || !req.getEmployee().getBranch().getBranchId().equals(loggedIn.getBranch().getBranchId()))) {
+                return ResponseEntity.status(403).body("Không có quyền phê duyệt cho nhân viên chi nhánh khác.");
+            }
+
+            hrService.approveLeaveRequest(id);
+            return ResponseEntity.ok(java.util.Map.of("message", "Đã phê duyệt đơn xin nghỉ phép thành công."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/leave-requests/reject/{id}")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> rejectLeaveRequest(@PathVariable Long id) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            LeaveRequest req = leaveRequestRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn xin nghỉ phép"));
+
+            if (!web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn) && loggedIn.getBranch() != null && (req.getEmployee().getBranch() == null || !req.getEmployee().getBranch().getBranchId().equals(loggedIn.getBranch().getBranchId()))) {
+                return ResponseEntity.status(403).body("Không có quyền phê duyệt cho nhân viên chi nhánh khác.");
+            }
+
+            req.setStatus("REJECTED");
+            leaveRequestRepository.save(req);
+            return ResponseEntity.ok(java.util.Map.of("message", "Đã từ chối đơn xin nghỉ phép."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/forgot-clock/approve/{id}")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> approveForgotClock(@PathVariable Long id) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            ForgotClockRequest req = forgotClockRequestRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn bổ sung công"));
+
+            if (!web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn) && loggedIn.getBranch() != null && (req.getEmployee().getBranch() == null || !req.getEmployee().getBranch().getBranchId().equals(loggedIn.getBranch().getBranchId()))) {
+                return ResponseEntity.status(403).body("Không có quyền phê duyệt cho nhân viên chi nhánh khác.");
+            }
+
+            hrService.approveForgotClock(id);
+            return ResponseEntity.ok(java.util.Map.of("message", "Đã phê duyệt bổ sung công thành công."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/hr/forgot-clock/reject/{id}")
+    @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> rejectForgotClock(@PathVariable Long id) {
+        try {
+            User loggedIn = getLoggedInUser();
+            if (loggedIn == null) {
+                return ResponseEntity.status(401).body("Chưa đăng nhập");
+            }
+            ForgotClockRequest req = forgotClockRequestRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn bổ sung công"));
+
+            if (!web.restaurant.swp.config.BranchContext.canSwitchBranch(loggedIn) && loggedIn.getBranch() != null && (req.getEmployee().getBranch() == null || !req.getEmployee().getBranch().getBranchId().equals(loggedIn.getBranch().getBranchId()))) {
+                return ResponseEntity.status(403).body("Không có quyền phê duyệt cho nhân viên chi nhánh khác.");
+            }
+
+            req.setStatus("REJECTED");
+            forgotClockRequestRepository.save(req);
+            return ResponseEntity.ok(java.util.Map.of("message", "Đã từ chối đơn bổ sung công."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }

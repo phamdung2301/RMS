@@ -24,13 +24,14 @@ import web.restaurant.swp.modules.promotion.service.*;
 import web.restaurant.swp.modules.analytics.service.*;
 import web.restaurant.swp.modules.branch.model.*;
 import web.restaurant.swp.modules.branch.repository.*;
+import web.restaurant.swp.modules.tenant.model.*;
 
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "inventory_items")
+@Table(name = "inventory_items", uniqueConstraints = @UniqueConstraint(columnNames = {"sku", "tenant_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -40,7 +41,7 @@ public class InventoryItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String sku; // Unique raw material code
 
     @Column(nullable = false)
@@ -51,4 +52,8 @@ public class InventoryItem {
 
     @Column(name = "minimum_threshold", nullable = false)
     private Double minimumThreshold = 0.0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id")
+    private Tenant tenant;
 }

@@ -36,4 +36,6 @@ import java.util.Optional;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
     Optional<Category> findByName(String name);
+    Optional<Category> findByNameAndTenantTenantId(String name, String tenantId);
+    List<Category> findByTenantTenantId(String tenantId);
 }

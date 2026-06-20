@@ -63,6 +63,9 @@ public class AuditLog {
     @Column(name = "ip_address")
     private String ipAddress;
 
+    @Column(name = "branch_id", length = 36)
+    private String branchId;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

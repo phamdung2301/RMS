@@ -57,11 +57,7 @@ public class KdsController {
     }
 
     private String getActiveBranchId() {
-        User user = getLoggedInUser();
-        if (user != null && user.getBranch() != null) {
-            return user.getBranch().getBranchId();
-        }
-        return "branch-1";
+        return web.restaurant.swp.config.BranchContext.getActiveBranchId(getLoggedInUser());
     }
 
     @GetMapping("/kds")

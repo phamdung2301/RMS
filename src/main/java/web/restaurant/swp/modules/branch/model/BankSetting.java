@@ -25,4 +25,8 @@ public class BankSetting {
 
     @Column(name = "account_holder", nullable = false)
     private String accountHolder;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
 }

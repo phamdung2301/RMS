@@ -37,4 +37,7 @@ import java.util.Optional;
 public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByIsActiveTrue();
     List<Product> findByCategoryIdAndIsActiveTrue(Long categoryId);
+    List<Product> findByTenantTenantId(String tenantId);
+    List<Product> findByTenantTenantIdAndIsActiveTrue(String tenantId);
+    List<Product> findByCategoryIdAndTenantTenantIdAndIsActiveTrue(Long categoryId, String tenantId);
 }

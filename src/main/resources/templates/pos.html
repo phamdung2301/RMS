@@ -27,6 +27,10 @@
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER')"><a href="#" onclick="openOrderLogsModal()">📋 Nhật Ký Gọi Món</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -37,10 +41,23 @@
         <!-- Main Content -->
         <div class="main-content">
             <!-- Top Bar -->
-            <div class="top-bar">
+            <div class="top-bar" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h2 class="page-title">Sơ Đồ Bàn</h2>
-                    <p style="color: var(--text-muted); font-size: 14px;">Chi nhánh hiện tại: Trung Tâm</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 4px 8px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            <option th:each="b : ${branches}" 
+                                    th:value="${b.branchId}" 
+                                    th:text="${'Chi nhánh: ' + b.name}" 
+                                    th:selected="${b.branchId == activeBranchId}">
+                                Chi nhánh: Trung Tâm
+                            </option>
+                        </select>
+                        <span th:if="${!canSwitchBranch}" style="color: var(--text-muted); font-size: 14px;" 
+                              th:text="${'Chi nhánh hiện tại: ' + (activeBranchName != null ? activeBranchName : 'Toàn hệ thống')}">
+                            Chi nhánh hiện tại: Trung Tâm
+                        </span>
+                    </div>
                 </div>
                 <div class="status-legend">
                     <span style="color: var(--color-success);">● Trống (Empty)</span>
@@ -918,6 +935,135 @@
                 mapSection.style.setProperty('display', 'none', 'important');
             }
         }
+
+        // Order Activity Logs Logic
+        function openOrderLogsModal() {
+            document.getElementById('orderLogsModal').classList.add('active');
+            loadOrderLogs('day');
+        }
+
+        function closeOrderLogsModal() {
+            document.getElementById('orderLogsModal').classList.remove('active');
+        }
+
+        function loadOrderLogs(range) {
+            const ranges = ['day', 'week', 'month'];
+            ranges.forEach(r => {
+                const btn = document.getElementById('btnLog' + r.charAt(0).toUpperCase() + r.slice(1));
+                if (btn) {
+                    if (r === range) {
+                        btn.classList.remove('btn-secondary');
+                        btn.classList.add('btn-primary');
+                    } else {
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('btn-secondary');
+                    }
+                }
+            });
+
+            let rangeText = "Hôm Nay";
+            if (range === 'week') rangeText = "7 Ngày Qua";
+            else if (range === 'month') rangeText = "Tháng Này";
+            document.getElementById('lblLogRangeText').innerText = rangeText;
+
+            fetch('/api/pos/order-logs?range=' + range)
+                .then(res => res.json())
+                .then(logs => {
+                    let listHtml = "";
+                    if (logs.length === 0) {
+                        listHtml = `<tr><td colspan="5" style="text-align:center; padding: 16px; color: var(--text-muted);">Không tìm thấy nhật ký hoạt động nào trong khoảng thời gian này.</td></tr>`;
+                    } else {
+                        logs.forEach(log => {
+                            let dateObj = new Date(log.createdAt);
+                            let formattedTime = dateObj.toLocaleDateString('vi-VN', {
+                                day: '2-digit', month: '2-digit', year: 'numeric'
+                            }) + ' ' + dateObj.toLocaleTimeString('vi-VN', {
+                                hour: '2-digit', minute: '2-digit', second: '2-digit'
+                            });
+
+                            let actionBadgeClass = "badge-orange";
+                            if (log.action === 'BILL_PAYMENT') actionBadgeClass = "badge-green";
+                            else if (log.action === 'OPEN_SESSION') actionBadgeClass = "badge-blue";
+
+                            listHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px; font-family: monospace;">${formattedTime}</td>
+                                    <td style="padding: 10px; font-weight: 600;">${log.userName}</td>
+                                    <td style="padding: 10px;"><span class="status-badge ${actionBadgeClass}" style="padding: 2px 8px; font-size:11px;">${log.action}</span></td>
+                                    <td style="padding: 10px; line-height: 1.4;">${log.description}</td>
+                                    <td style="padding: 10px; font-family: monospace; color: var(--text-muted);">${log.ipAddress}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    document.getElementById('orderLogsList').innerHTML = listHtml;
+                })
+                .catch(err => {
+                    showToast("Lỗi khi tải nhật ký hoạt động: " + err.message, "error");
+                });
+        }
+    </script>
+
+    <!-- Order Logs Modal (Thanh toán & Gọi món) -->
+    <div class="modal-overlay" id="orderLogsModal">
+        <div class="modal-box" style="width: 850px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 20px; font-weight: 700;">📋 Nhật Ký Hoạt Động Gọi Món &amp; Thanh Toán</h3>
+                <button class="modal-close" onclick="closeOrderLogsModal()">×</button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" id="btnLogDay" onclick="loadOrderLogs('day')">Hôm Nay</button>
+                    <button class="btn btn-secondary" id="btnLogWeek" onclick="loadOrderLogs('week')">Tuần Này</button>
+                    <button class="btn btn-secondary" id="btnLogMonth" onclick="loadOrderLogs('month')">Tháng Này</button>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted);">
+                    Lọc theo: <span id="lblLogRangeText" style="font-weight: 600; color: var(--color-primary);">Hôm Nay</span>
+                </div>
+            </div>
+            
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
+                <div class="table-responsive">
+                    <table class="premium-table" style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 8px; width: 160px;">Thời gian</th>
+                                <th style="padding: 8px; width: 140px;">Nhân viên</th>
+                                <th style="padding: 8px; width: 130px;">Hành động</th>
+                                <th style="padding: 8px;">Chi tiết</th>
+                                <th style="padding: 8px; width: 110px;">Địa chỉ IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderLogsList">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>

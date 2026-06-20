@@ -36,6 +36,7 @@ import java.util.Optional;
 @Repository
 public interface ProductStockRepository extends JpaRepository<ProductStock, Long> {
     List<ProductStock> findByVariantId(Long variantId);
+    List<ProductStock> findByVariantProductTenantTenantId(String tenantId);
 }
 
 // --- ORDERS ---

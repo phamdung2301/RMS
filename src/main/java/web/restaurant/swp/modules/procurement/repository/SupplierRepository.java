@@ -36,4 +36,6 @@ import java.util.Optional;
 @Repository
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
     Optional<Supplier> findByCode(String code);
+    Optional<Supplier> findByCodeAndTenantTenantId(String code, String tenantId);
+    List<Supplier> findByTenantTenantId(String tenantId);
 }

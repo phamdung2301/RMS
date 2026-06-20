@@ -34,4 +34,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ShiftTemplateRepository extends JpaRepository<ShiftTemplate, Long> {}
+public interface ShiftTemplateRepository extends JpaRepository<ShiftTemplate, Long> {
+    List<ShiftTemplate> findByTenantTenantId(String tenantId);
+}

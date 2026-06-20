@@ -24,6 +24,9 @@
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
                     <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -37,9 +40,22 @@
             <div class="top-bar">
                 <div>
                     <h2 class="page-title">Quản Lý Tồn Kho</h2>
-                    <p style="color: var(--text-muted); font-size: 14px;">Quản lý và điều chỉnh số lượng nguyên vật liệu tại chi nhánh</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 4px 8px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            <option th:each="b : ${branches}" 
+                                    th:value="${b.branchId}" 
+                                    th:text="${'Chi nhánh: ' + b.name}" 
+                                    th:selected="${b.branchId == activeBranchId}">
+                                Chi nhánh: Trung Tâm
+                            </option>
+                        </select>
+                        <span th:if="${!canSwitchBranch}" style="color: var(--text-muted); font-size: 14px;" 
+                              th:text="${'Chi nhánh hiện tại: ' + (activeBranchName != null ? activeBranchName : 'Toàn hệ thống')}">
+                            Chi nhánh hiện tại: Trung Tâm
+                        </span>
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="showToast('Mở form điều chuyển kho nội bộ...', 'info')">
+                <button class="btn btn-primary" onclick="openTransferModal()">
                     🔄 Yêu Cầu Điều Chuyển
                 </button>
             </div>
@@ -58,6 +74,8 @@
                 <button class="btn btn-secondary active-tab" id="tab-stock" onclick="switchInventoryTab('stock')">🪵 Tồn Kho Nguyên Liệu</button>
                 <button class="btn btn-secondary" id="tab-recipe" onclick="switchInventoryTab('recipe')">🍳 Định Lượng Công Thức (Đầu Bếp)</button>
                 <button class="btn btn-secondary" id="tab-menu" onclick="switchInventoryTab('menu')">🍽️ Quản Lý Thực Đơn (Món Ăn)</button>
+                <button class="btn btn-secondary" id="tab-item" onclick="switchInventoryTab('item')">📦 Cấu Hình Nguyên Liệu</button>
+                <button class="btn btn-secondary" id="tab-transfer" onclick="switchInventoryTab('transfer')">🔄 Điều Chuyển Kho</button>
             </div>
 
             <!-- Inventory table -->
@@ -103,50 +121,265 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Recipes list (hidden by default) -->
-    <div id="recipe-container" class="glass-panel" style="display: none; margin: 0 32px 32px 32px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h4 style="font-size: 18px; font-weight: 600;">Định Lượng Nguyên Liệu Cho Từng Món Ăn</h4>
-            <button class="btn btn-primary" onclick="openRecipeModal()">
-                ➕ Cài Đặt Công Thức Món Ăn
-            </button>
-        </div>
-        <div class="table-responsive">
-            <table class="premium-table">
-                <thead>
-                    <tr>
-                        <th>TÊN MÓN ĂN (BIẾN THỂ)</th>
-                        <th>SKU MÃ</th>
-                        <th>NGUYÊN LIỆU TIÊU HAO</th>
-                        <th style="text-align: right;">ĐỊNH LƯỢNG YÊU CẦU / 1 PHẦN AN</th>
-                        <th style="text-align: right;">HÀNH ĐỘNG</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="pStock : ${productStocks}">
-                        <td th:text="${pStock.variant.product.name + ' - ' + pStock.variant.name}" style="font-weight: 600;">Phở Bò - Size Vừa</td>
-                        <td th:text="${pStock.variant.sku}">PHOBOS</td>
-                        <td th:text="${pStock.item.name}">Thịt bò</td>
-                        <td style="text-align: right; font-weight: 700; color: var(--color-warning);" th:text="${pStock.quantityNeeded + ' ' + pStock.item.unit}">0.15 kg</td>
-                        <td style="text-align: right;">
-                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
-                                    th:data-id="${pStock.id}"
-                                    onclick="deleteRecipe(this.getAttribute('data-id'))">
-                                🗑️ Xóa
+            <!-- Recipes list (hidden by default) -->
+            <div id="recipe-container" class="glass-panel" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4 style="font-size: 18px; font-weight: 600;">Định Lượng Nguyên Liệu Cho Từng Món Ăn</h4>
+                    <button class="btn btn-primary" onclick="openRecipeModal()">
+                        ➕ Cài Đặt Công Thức Món Ăn
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>TÊN MÓN ĂN (BIẾN THỂ)</th>
+                                <th>SKU MÃ</th>
+                                <th>NGUYÊN LIỆU TIÊU HAO</th>
+                                <th style="text-align: right;">ĐỊNH LƯỢNG YÊU CẦU / 1 PHẦN AN</th>
+                                <th style="text-align: right;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="pStock : ${productStocks}">
+                                <td th:text="${pStock.variant.product.name + ' - ' + pStock.variant.name}" style="font-weight: 600;">Phở Bò - Size Vừa</td>
+                                <td th:text="${pStock.variant.sku}">PHOBOS</td>
+                                <td th:text="${pStock.item.name}">Thịt bò</td>
+                                <td style="text-align: right; font-weight: 700; color: var(--color-warning);" th:text="${pStock.quantityNeeded + ' ' + pStock.item.unit}">0.15 kg</td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
+                                                th:data-varid="${pStock.variant.id}"
+                                                onclick="openRecipeModal(this.getAttribute('data-varid'))">
+                                            ✏️ Sửa
+                                        </button>
+                                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
+                                                th:data-id="${pStock.id}"
+                                                onclick="deleteRecipe(this.getAttribute('data-id'))">
+                                            🗑️ Xóa
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Menu CRUD Panel (hidden by default) -->
+            <div id="menu-container" class="glass-panel" style="display: none;">
+                <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                    <!-- Category CRUD Panel (left/small) -->
+                    <div style="flex: 1; min-width: 300px;" class="glass-panel">
+                        <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">📁 Quản Lý Danh Mục</h4>
+                        <form onsubmit="saveCategory(event)" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                            <input type="text" id="catName" class="form-input" placeholder="Tên danh mục mới..." required style="flex: 1;">
+                            <button type="submit" class="btn btn-primary" style="padding: 0 12px;">Thêm</button>
+                        </form>
+                        <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>DANH MỤC</th>
+                                        <th style="text-align: right;">HÀNH ĐỘNG</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="cat : ${categories}">
+                                        <td th:text="${cat.name}" style="font-weight: 600;">Món chính</td>
+                                        <td style="text-align: right;">
+                                            <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" 
+                                                    th:data-id="${cat.id}"
+                                                    onclick="deleteCategory(this.getAttribute('data-id'))">
+                                                🗑️ Xóa
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Dish CRUD Panel (right/large) -->
+                    <div style="flex: 3; min-width: 600px;" class="glass-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h4 style="font-size: 18px; font-weight: 600;">🍽️ Danh Sách Món Ăn & Biến Thể</h4>
+                            <button class="btn btn-primary" onclick="openMenuModal()">
+                                ➕ Thêm Món Ăn Mới
                             </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>TÊN MÓN ĂN (BIẾN THỂ)</th>
+                                        <th>DANH MỤC</th>
+                                        <th>MÃ SKU</th>
+                                        <th style="text-align: right;">GIÁ BÁN</th>
+                                        <th style="text-align: right;">GIÁ VỐN</th>
+                                        <th>TRẠNG THÁI</th>
+                                        <th style="text-align: right;">HÀNH ĐỘNG</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="var : ${variants}">
+                                        <td th:text="${var.product.name + ' - ' + var.name}" style="font-weight: 600;">Phở Bò - Size Vừa</td>
+                                        <td th:text="${var.product.category != null ? var.product.category.name : 'Chưa phân loại'}">Món chính</td>
+                                        <td th:text="${var.sku}" style="font-family: monospace;">PHOBOS</td>
+                                        <td style="text-align: right; font-weight: 700; color: var(--color-green);" th:text="${#numbers.formatDecimal(var.price, 0, 'COMMA', 0, 'POINT') + 'đ'}">45,000đ</td>
+                                        <td style="text-align: right; color: var(--text-muted);" th:text="${#numbers.formatDecimal(var.originalPrice, 0, 'COMMA', 0, 'POINT') + 'đ'}">25,000đ</td>
+                                        <td>
+                                            <span th:class="${'status-badge ' + (var.product.isActive ? 'badge-green' : 'badge-red')}"
+                                                  th:text="${var.product.isActive ? 'Đang Bán' : 'Ngừng Bán'}">
+                                                Đang Bán
+                                            </span>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                                                <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                        th:data-id="${var.id}"
+                                                        th:data-prodname="${var.product.name}"
+                                                        th:data-catid="${var.product.category != null ? var.product.category.id : ''}"
+                                                        th:data-desc="${var.product.description}"
+                                                        th:data-img="${var.product.imagePath}"
+                                                        th:data-active="${var.product.isActive}"
+                                                        th:data-varname="${var.name}"
+                                                        th:data-price="${var.price}"
+                                                        th:data-origprice="${var.originalPrice}"
+                                                        th:data-sku="${var.sku}"
+                                                        onclick="editMenu(this)">
+                                                    ✏️ Sửa
+                                                </button>
+                                                <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;"
+                                                        th:data-id="${var.id}"
+                                                        onclick="deleteMenu(this.getAttribute('data-id'))">
+                                                    🗑️ Xóa
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw Materials Config Panel (hidden by default) -->
+            <div id="item-container" class="glass-panel" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4 style="font-size: 18px; font-weight: 600;">📦 Quản Lý Nguyên Liệu Trong Kho</h4>
+                    <button class="btn btn-primary" onclick="openItemModal()">
+                        ➕ Thêm Nguyên Liệu Mới
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>MÃ SKU</th>
+                                <th>TÊN NGUYÊN LIỆU</th>
+                                <th>ĐƠN VỊ TÍNH</th>
+                                <th>NGƯỠNG TỐI THIỂU (REORDER POINT)</th>
+                                <th style="text-align: right;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${inventoryItems}">
+                                <td th:text="${item.sku}" style="font-family: monospace;">MAT-001</td>
+                                <td th:text="${item.name}" style="font-weight: 600;">Bột mì</td>
+                                <td th:text="${item.unit}">kg</td>
+                                <td th:text="${item.minimumThreshold}">10.0</td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
+                                                th:data-id="${item.id}"
+                                                th:data-sku="${item.sku}"
+                                                th:data-name="${item.name}"
+                                                th:data-unit="${item.unit}"
+                                                th:data-threshold="${item.minimumThreshold}"
+                                                onclick="editItem(this)">
+                                            ✏️ Sửa
+                                        </button>
+                                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
+                                                th:data-id="${item.id}"
+                                                onclick="deleteItem(this.getAttribute('data-id'))">
+                                            🗑️ Xóa
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Branch Inventory Transfer Panel (hidden by default) -->
+            <div id="transfer-container" class="glass-panel" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4 style="font-size: 18px; font-weight: 600;">🔄 Lịch Sử Điều Chuyển Kho</h4>
+                    <button class="btn btn-primary" onclick="openTransferModal()">
+                        🔄 Tạo Yêu Cầu Điều Chuyển
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>MÃ YÊU CẦU</th>
+                                <th>LOẠI</th>
+                                <th>CHI NHÁNH GỬI (NGUỒN)</th>
+                                <th>CHI NHÁNH NHẬN (ĐÍCH)</th>
+                                <th>NGÀY YÊU CẦU</th>
+                                <th>TRẠNG THÁI</th>
+                                <th style="text-align: right;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="transfer : ${transfers}">
+                                <td th:text="${'TRF-' + transfer.id}">TRF-1</td>
+                                <td>
+                                    <span th:class="${'status-badge ' + (transfer.targetBranch.branchId == activeBranchId ? 'badge-orange' : 'badge-green')}"
+                                          th:text="${transfer.targetBranch.branchId == activeBranchId ? 'Nhận hàng' : 'Gửi hàng'}">
+                                        Nhận hàng
+                                    </span>
+                                </td>
+                                <td th:text="${transfer.sourceBranch.name}">Chi nhánh A</td>
+                                <td th:text="${transfer.targetBranch.name}">Chi nhánh B</td>
+                                <td th:text="${#temporals.format(transfer.requestDate, 'dd-MM-yyyy HH:mm')}">17-06-2026 12:00</td>
+                                <td>
+                                    <span th:class="${'status-badge ' + (transfer.status == 'PENDING' ? 'badge-orange' : (transfer.status == 'RECEIVED' ? 'badge-green' : 'badge-red'))}" 
+                                          th:text="${transfer.status == 'PENDING' ? 'Chờ phê duyệt' : (transfer.status == 'RECEIVED' ? 'Đã hoàn thành' : 'Đã hủy')}">
+                                        Chờ phê duyệt
+                                    </span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
+                                                th:data-id="${transfer.id}"
+                                                onclick="viewTransferDetails(this.getAttribute('data-id'))">
+                                            👁️ Chi tiết
+                                        </button>
+                                        <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" 
+                                                th:if="${transfer.status == 'PENDING' and transfer.sourceBranch.branchId == activeBranchId}"
+                                                th:data-id="${transfer.id}"
+                                                onclick="approveTransfer(this.getAttribute('data-id'))">
+                                            ✅ Phê duyệt
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Recipe Setup Modal -->
     <div class="modal-overlay" id="recipeModal">
-        <div class="modal-box">
+        <div class="modal-box" style="max-width: 550px; width: 95%;">
             <div class="modal-header">
                 <h3>Cài Đặt Định Lượng Công Thức</h3>
                 <button class="modal-close" onclick="closeRecipeModal()">×</button>
@@ -159,118 +392,58 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Chọn Nguyên Liệu Trong Kho</label>
-                    <select class="form-input" id="recipeItemId" style="width: 100%;">
-                        <option th:each="item : ${inventoryItems}" th:value="${item.id}" th:text="${item.name + ' (' + item.unit + ')'}"></option>
-                    </select>
+                    <label>Chọn các nguyên liệu và định lượng</label>
+                    <input type="text" class="form-input" id="recipeItemSearch" placeholder="Tìm kiếm nguyên liệu..." oninput="filterRecipeItems()" style="margin-bottom: 10px; width: 100%;">
+                    
+                    <div id="recipeItemsContainer" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.2);">
+                        <div th:each="item : ${inventoryItems}" class="recipe-item-checkbox-row" th:data-id="${item.id}" th:data-name="${#strings.toLowerCase(item.name)}" th:data-sku="${#strings.toLowerCase(item.sku)}" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" class="recipe-item-checkbox" th:id="${'cb-item-' + item.id}" th:value="${item.id}" onchange="toggleRecipeQtyInput(this)" style="width: auto; cursor: pointer;">
+                                <label th:for="${'cb-item-' + item.id}" th:text="${item.name + ' (' + item.unit + ')'}" style="margin-bottom: 0; cursor: pointer; font-size: 14px;"></label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <input type="number" step="0.001" class="form-input recipe-item-qty" th:id="${'qty-item-' + item.id}" placeholder="Định lượng..." disabled style="width: 110px; padding: 6px 10px; font-size: 13px; text-align: right;">
+                                <span th:text="${item.unit}" style="font-size: 12px; color: var(--text-muted); width: 25px;">kg</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Định lượng tiêu hao / 1 phần ăn</label>
-                    <input type="number" step="0.001" class="form-input" id="recipeQty" placeholder="Nhập lượng tiêu hao (vd: 0.15)..." required style="width: 100%;">
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 15px;">
                     Lưu công thức định lượng
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- Menu CRUD Panel (hidden by default) -->
-    <div id="menu-container" class="glass-panel" style="display: none; margin: 0 32px 32px 32px;">
-        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-            <!-- Category CRUD Panel (left/small) -->
-            <div style="flex: 1; min-width: 300px;" class="glass-panel">
-                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">📁 Quản Lý Danh Mục</h4>
-                <form onsubmit="saveCategory(event)" style="display: flex; gap: 8px; margin-bottom: 16px;">
-                    <input type="text" id="catName" class="form-input" placeholder="Tên danh mục mới..." required style="flex: 1;">
-                    <button type="submit" class="btn btn-primary" style="padding: 0 12px;">Thêm</button>
-                </form>
-                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
-                    <table class="premium-table">
-                        <thead>
-                            <tr>
-                                <th>DANH MỤC</th>
-                                <th style="text-align: right;">HÀNH ĐỘNG</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="cat : ${categories}">
-                                <td th:text="${cat.name}" style="font-weight: 600;">Món chính</td>
-                                <td style="text-align: right;">
-                                    <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" 
-                                            th:data-id="${cat.id}"
-                                            onclick="deleteCategory(this.getAttribute('data-id'))">
-                                        🗑️ Xóa
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+    <!-- Raw Material Setup Modal -->
+    <div class="modal-overlay" id="itemModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="itemModalTitle">Thêm Nguyên Liệu Mới</h3>
+                <button class="modal-close" onclick="closeItemModal()">×</button>
             </div>
-
-            <!-- Dish CRUD Panel (right/large) -->
-            <div style="flex: 3; min-width: 600px;" class="glass-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h4 style="font-size: 18px; font-weight: 600;">🍽️ Danh Sách Món Ăn & Biến Thể</h4>
-                    <button class="btn btn-primary" onclick="openMenuModal()">
-                        ➕ Thêm Món Ăn Mới
-                    </button>
+            <form onsubmit="saveItem(event)">
+                <input type="hidden" id="itemId">
+                <div class="form-group">
+                    <label>Mã SKU nguyên liệu (Duy nhất)</label>
+                    <input type="text" class="form-input" id="itemSku" placeholder="Ví dụ: MAT-021..." required style="width: 100%;">
                 </div>
-                <div class="table-responsive">
-                    <table class="premium-table">
-                        <thead>
-                            <tr>
-                                <th>TÊN MÓN ĂN (BIẾN THỂ)</th>
-                                <th>DANH MỤC</th>
-                                <th>MÃ SKU</th>
-                                <th style="text-align: right;">GIÁ BÁN</th>
-                                <th style="text-align: right;">GIÁ VỐN</th>
-                                <th>TRẠNG THÁI</th>
-                                <th style="text-align: right;">HÀNH ĐỘNG</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="var : ${variants}">
-                                <td th:text="${var.product.name + ' - ' + var.name}" style="font-weight: 600;">Phở Bò - Size Vừa</td>
-                                <td th:text="${var.product.category != null ? var.product.category.name : 'Chưa phân loại'}">Món chính</td>
-                                <td th:text="${var.sku}" style="font-family: monospace;">PHOBOS</td>
-                                <td style="text-align: right; font-weight: 700; color: var(--color-green);" th:text="${#numbers.formatDecimal(var.price, 0, 'COMMA', 0, 'POINT') + 'đ'}">45,000đ</td>
-                                <td style="text-align: right; color: var(--text-muted);" th:text="${#numbers.formatDecimal(var.originalPrice, 0, 'COMMA', 0, 'POINT') + 'đ'}">25,000đ</td>
-                                <td>
-                                    <span th:class="${'status-badge ' + (var.product.isActive ? 'badge-green' : 'badge-red')}"
-                                          th:text="${var.product.isActive ? 'Đang Bán' : 'Ngừng Bán'}">
-                                        Đang Bán
-                                    </span>
-                                </td>
-                                <td style="text-align: right;">
-                                    <div style="display: flex; gap: 4px; justify-content: flex-end;">
-                                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
-                                                th:data-id="${var.id}"
-                                                th:data-prodname="${var.product.name}"
-                                                th:data-catid="${var.product.category != null ? var.product.category.id : ''}"
-                                                th:data-desc="${var.product.description}"
-                                                th:data-img="${var.product.imagePath}"
-                                                th:data-active="${var.product.isActive}"
-                                                th:data-varname="${var.name}"
-                                                th:data-price="${var.price}"
-                                                th:data-origprice="${var.originalPrice}"
-                                                th:data-sku="${var.sku}"
-                                                onclick="editMenu(this)">
-                                            ✏️ Sửa
-                                        </button>
-                                        <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;"
-                                                th:data-id="${var.id}"
-                                                onclick="deleteMenu(this.getAttribute('data-id'))">
-                                            🗑️ Xóa
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="form-group">
+                    <label>Tên Nguyên Liệu</label>
+                    <input type="text" class="form-input" id="itemName" placeholder="Ví dụ: Thịt gà, Hành lá..." required style="width: 100%;">
                 </div>
-            </div>
+                <div class="form-group">
+                    <label>Đơn Vị Tính</label>
+                    <input type="text" class="form-input" id="itemUnit" placeholder="Ví dụ: kg, quả, lít, hộp..." required style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label>Ngưỡng cảnh báo tối thiểu (Reorder Point)</label>
+                    <input type="number" step="0.01" class="form-input" id="itemThreshold" value="10.0" required style="width: 100%;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+                    Lưu nguyên liệu
+                </button>
+            </form>
         </div>
     </div>
 
@@ -331,6 +504,97 @@
             </form>
         </div>
     </div>
+    <!-- Create Branch Transfer Modal -->
+    <div class="modal-overlay" id="createTransferModal">
+        <div class="modal-box" style="max-width: 650px; width: 95%;">
+            <div class="modal-header">
+                <h3>Yêu Cầu Điều Chuyển Kho Nội Bộ</h3>
+                <button class="modal-close" onclick="closeTransferModal()">×</button>
+            </div>
+            <form onsubmit="submitTransfer(event)">
+                <div class="form-group">
+                    <label>Chi nhánh cung cấp (Nguồn gửi)</label>
+                    <select class="form-input" id="transferSourceBranchId" style="width: 100%;" required>
+                        <option value="" disabled selected>-- Chọn chi nhánh nguồn --</option>
+                        <option th:each="b : ${otherBranches}" th:value="${b.branchId}" th:text="${b.name}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin-bottom: 0;">Danh sách nguyên liệu điều chuyển</label>
+                        <button type="button" class="btn btn-secondary" onclick="addTransferLine()" style="padding: 4px 10px; font-size: 13px;">➕ Thêm dòng</button>
+                    </div>
+                    
+                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.2);">
+                        <table class="premium-table" style="margin-bottom: 0;">
+                            <thead>
+                                <tr>
+                                    <th>Nguyên liệu</th>
+                                    <th style="width: 130px;">Số lượng</th>
+                                    <th style="width: 60px; text-align: center;">Xóa</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transfer-lines-body">
+                                <!-- Dynamic rows added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 15px;">
+                    🔄 Gửi yêu cầu điều chuyển
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Branch Transfer Details Modal -->
+    <div class="modal-overlay" id="transferDetailsModal">
+        <div class="modal-box" style="max-width: 600px; width: 95%;">
+            <div class="modal-header">
+                <h3 id="detailTitle">Chi Tiết Yêu Cầu Điều Chuyển</h3>
+                <button class="modal-close" onclick="closeTransferDetailsModal()">×</button>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+                    <div><b>Chi nhánh gửi (Nguồn):</b> <span id="detailSourceBranch"></span></div>
+                    <div><b>Chi nhánh nhận (Đích):</b> <span id="detailTargetBranch"></span></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                    <div><b>Trạng thái:</b> <span id="detailStatus" class="status-badge"></span></div>
+                    <div><b>Ngày yêu cầu:</b> <span id="detailRequestDate"></span></div>
+                </div>
+                <div id="detailApproveDateRow" style="margin-top: 8px; display: none; font-size: 14px;">
+                    <b>Ngày phê duyệt:</b> <span id="detailApproveDate"></span>
+                </div>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;">
+                <table class="premium-table">
+                    <thead>
+                        <tr>
+                            <th>MÃ SKU</th>
+                            <th>TÊN NGUYÊN LIỆU</th>
+                            <th>ĐƠN VỊ TÍNH</th>
+                            <th style="text-align: right;">SỐ LƯỢNG</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detail-items-body">
+                        <!-- Dynamic items -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <button class="btn btn-secondary" onclick="closeTransferDetailsModal()" style="width: 100%; justify-content: center;">Đóng</button>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const inventoryItemsList = /*[[${inventoryItems}]]*/ [];
+        /*]]>*/
+    </script>
 
     <script>
         function adjustStock(itemId, itemName, currentQty) {
@@ -373,12 +637,16 @@
             document.getElementById('tab-stock').classList.remove('active-tab');
             document.getElementById('tab-recipe').classList.remove('active-tab');
             document.getElementById('tab-menu').classList.remove('active-tab');
+            if (document.getElementById('tab-item')) document.getElementById('tab-item').classList.remove('active-tab');
+            if (document.getElementById('tab-transfer')) document.getElementById('tab-transfer').classList.remove('active-tab');
             
             document.getElementById('tab-' + tabType).classList.add('active-tab');
             
             document.getElementById('stock-container').style.display = 'none';
             document.getElementById('recipe-container').style.display = 'none';
             document.getElementById('menu-container').style.display = 'none';
+            if (document.getElementById('item-container')) document.getElementById('item-container').style.display = 'none';
+            if (document.getElementById('transfer-container')) document.getElementById('transfer-container').style.display = 'none';
             
             if (tabType === 'stock') {
                 document.getElementById('stock-container').style.display = 'block';
@@ -386,11 +654,82 @@
                 document.getElementById('recipe-container').style.display = 'block';
             } else if (tabType === 'menu') {
                 document.getElementById('menu-container').style.display = 'block';
+            } else if (tabType === 'item') {
+                document.getElementById('item-container').style.display = 'block';
+            } else if (tabType === 'transfer') {
+                if (document.getElementById('transfer-container')) document.getElementById('transfer-container').style.display = 'block';
             }
         }
         
-        function openRecipeModal() {
-            document.getElementById('recipeQty').value = '';
+        function toggleRecipeQtyInput(checkbox) {
+            let itemId = checkbox.value;
+            let qtyInput = document.getElementById('qty-item-' + itemId);
+            if (qtyInput) {
+                if (checkbox.checked) {
+                    qtyInput.disabled = false;
+                    qtyInput.required = true;
+                    if (!qtyInput.value) qtyInput.value = '0.001';
+                } else {
+                    qtyInput.disabled = true;
+                    qtyInput.required = false;
+                    qtyInput.value = '';
+                }
+            }
+        }
+
+        function filterRecipeItems() {
+            let query = document.getElementById('recipeItemSearch').value.toLowerCase().trim();
+            let rows = document.querySelectorAll('.recipe-item-checkbox-row');
+            rows.forEach(row => {
+                let name = row.getAttribute('data-name');
+                let sku = row.getAttribute('data-sku');
+                if (name.includes(query) || sku.includes(query)) {
+                    row.style.setProperty('display', 'flex', 'important');
+                } else {
+                    row.style.setProperty('display', 'none', 'important');
+                }
+            });
+        }
+
+        function loadRecipesForSelectedVariant() {
+            let variantId = document.getElementById('recipeVariantId').value;
+            if (!variantId) return;
+
+            // Reset all checkboxes and inputs first
+            let checkboxes = document.querySelectorAll('.recipe-item-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                toggleRecipeQtyInput(cb);
+            });
+
+            fetch('/api/inventory/recipes/variant/' + variantId)
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(ps => {
+                    let cb = document.getElementById('cb-item-' + ps.item.id);
+                    if (cb) {
+                        cb.checked = true;
+                        let qtyInput = document.getElementById('qty-item-' + ps.item.id);
+                        if (qtyInput) {
+                            qtyInput.disabled = false;
+                            qtyInput.required = true;
+                            qtyInput.value = ps.quantityNeeded;
+                        }
+                    }
+                });
+            })
+            .catch(err => console.error("Lỗi tải định lượng món ăn: ", err));
+        }
+
+        function openRecipeModal(variantId = null) {
+            document.getElementById('recipeItemSearch').value = '';
+            filterRecipeItems();
+            
+            if (variantId) {
+                document.getElementById('recipeVariantId').value = variantId;
+            }
+            
+            loadRecipesForSelectedVariant();
             document.getElementById('recipeModal').classList.add('active');
         }
         
@@ -401,16 +740,29 @@
         function saveRecipe(e) {
             e.preventDefault();
             let variantId = parseInt(document.getElementById('recipeVariantId').value);
-            let itemId = parseInt(document.getElementById('recipeItemId').value);
-            let qty = parseFloat(document.getElementById('recipeQty').value);
             
-            fetch('/api/inventory/recipes', {
+            let portions = [];
+            let checkedBoxes = document.querySelectorAll('.recipe-item-checkbox:checked');
+            checkedBoxes.forEach(cb => {
+                let itemId = parseInt(cb.value);
+                let qtyInput = document.getElementById('qty-item-' + itemId);
+                if (qtyInput) {
+                    let qty = parseFloat(qtyInput.value);
+                    if (!isNaN(qty) && qty > 0) {
+                        portions.push({
+                            itemId: itemId,
+                            quantityNeeded: qty
+                        });
+                    }
+                }
+            });
+
+            fetch('/api/inventory/recipes/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     variantId: variantId,
-                    itemId: itemId,
-                    quantityNeeded: qty
+                    portions: portions
                 })
             })
             .then(async response => {
@@ -439,6 +791,93 @@
                 } else {
                     let text = await response.text();
                     showToast("Lỗi xóa định lượng: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        // Item CRUD Actions
+        function openItemModal() {
+            document.getElementById('itemId').value = '';
+            document.getElementById('itemSku').value = '';
+            document.getElementById('itemSku').disabled = false;
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemUnit').value = '';
+            document.getElementById('itemThreshold').value = '10.0';
+            
+            document.getElementById('itemModalTitle').innerText = 'Thêm Nguyên Liệu Mới';
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function closeItemModal() {
+            document.getElementById('itemModal').classList.remove('active');
+        }
+
+        function editItem(btn) {
+            document.getElementById('itemId').value = btn.getAttribute('data-id');
+            document.getElementById('itemSku').value = btn.getAttribute('data-sku');
+            document.getElementById('itemSku').disabled = true; // SKU is immutable
+            document.getElementById('itemName').value = btn.getAttribute('data-name');
+            document.getElementById('itemUnit').value = btn.getAttribute('data-unit');
+            document.getElementById('itemThreshold').value = btn.getAttribute('data-threshold');
+
+            document.getElementById('itemModalTitle').innerText = 'Chỉnh Sửa Nguyên Liệu';
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function saveItem(e) {
+            e.preventDefault();
+            let id = document.getElementById('itemId').value;
+            let sku = document.getElementById('itemSku').value.trim();
+            let name = document.getElementById('itemName').value.trim();
+            let unit = document.getElementById('itemUnit').value.trim();
+            let threshold = parseFloat(document.getElementById('itemThreshold').value);
+
+            fetch('/api/inventory/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: id ? parseInt(id) : null,
+                    sku: sku,
+                    name: name,
+                    unit: unit,
+                    minimumThreshold: threshold
+                })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã lưu nguyên liệu thành công.", "success");
+                    closeItemModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi lưu nguyên liệu: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        // Add DOM event handler for variant select and other setups
+        document.addEventListener('DOMContentLoaded', () => {
+            let selectVariant = document.getElementById('recipeVariantId');
+            if (selectVariant) {
+                selectVariant.addEventListener('change', loadRecipesForSelectedVariant);
+            }
+        });
+
+        function deleteItem(id) {
+            if (!confirm("Bạn có chắc chắn muốn xóa nguyên liệu này? Xóa nguyên liệu sẽ tự động xóa tất cả định lượng công thức liên quan.")) return;
+
+            fetch('/api/inventory/items/' + id, {
+                method: 'DELETE'
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã xóa nguyên liệu thành công.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi xóa nguyên liệu: " + text, "warning");
                 }
             })
             .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
@@ -577,6 +1016,205 @@
             })
             .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
         }
+
+        // --- Branch Transfer JS Logic ---
+        function openTransferModal() {
+            document.getElementById('transferSourceBranchId').value = '';
+            document.getElementById('transfer-lines-body').innerHTML = '';
+            addTransferLine(); // Add one default blank line
+            document.getElementById('createTransferModal').classList.add('active');
+        }
+
+        function closeTransferModal() {
+            document.getElementById('createTransferModal').classList.remove('active');
+        }
+
+        function addTransferLine() {
+            let tbody = document.getElementById('transfer-lines-body');
+            let rowId = 'tr-line-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            let tr = document.createElement('tr');
+            tr.id = rowId;
+            
+            let materialOptions = '';
+            inventoryItemsList.forEach(item => {
+                materialOptions += `<option value="${item.id}" data-unit="${item.unit}">${item.name} (${item.unit})</option>`;
+            });
+
+            tr.innerHTML = `
+                <td>
+                    <select class="form-input transfer-item-select" onchange="updateTransferLineUnit(this)" style="width: 100%;" required>
+                        <option value="" disabled selected>-- Chọn nguyên liệu --</option>
+                        ${materialOptions}
+                    </select>
+                </td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" step="0.01" class="form-input transfer-item-qty" placeholder="Số lượng..." required min="0.01" style="width: 100%; text-align: right;">
+                        <span class="transfer-item-unit" style="font-size: 13px; color: var(--text-muted); width: 35px;">-</span>
+                    </div>
+                </td>
+                <td style="text-align: center;">
+                    <button type="button" class="btn btn-danger" onclick="removeTransferLine('${rowId}')" style="padding: 4px 8px; font-size: 12px;">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function removeTransferLine(rowId) {
+            let tr = document.getElementById(rowId);
+            if (tr) tr.remove();
+        }
+
+        function updateTransferLineUnit(select) {
+            let option = select.options[select.selectedIndex];
+            let unitSpan = select.closest('tr').querySelector('.transfer-item-unit');
+            if (unitSpan && option) {
+                unitSpan.innerText = option.getAttribute('data-unit') || '-';
+            }
+        }
+
+        function submitTransfer(e) {
+            e.preventDefault();
+            let sourceBranchId = document.getElementById('transferSourceBranchId').value;
+            if (!sourceBranchId) {
+                showToast("Vui lòng chọn chi nhánh nguồn!", "warning");
+                return;
+            }
+
+            let selects = document.querySelectorAll('.transfer-item-select');
+            let qtys = document.querySelectorAll('.transfer-item-qty');
+            
+            let itemIds = [];
+            let quantities = [];
+            let hasDuplicate = false;
+
+            selects.forEach((select, idx) => {
+                let id = parseInt(select.value);
+                let qty = parseFloat(qtys[idx].value);
+                
+                if (itemIds.includes(id)) {
+                    hasDuplicate = true;
+                }
+                
+                if (!isNaN(id) && !isNaN(qty) && qty > 0) {
+                    itemIds.push(id);
+                    quantities.push(qty);
+                }
+            });
+
+            if (hasDuplicate) {
+                showToast("Danh sách có nguyên liệu bị trùng lặp, vui lòng gộp dòng hoặc xóa bớt!", "warning");
+                return;
+            }
+            if (itemIds.length === 0) {
+                showToast("Vui lòng thêm ít nhất một nguyên liệu để điều chuyển!", "warning");
+                return;
+            }
+
+            fetch('/api/inventory/transfer/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sourceBranchId: sourceBranchId,
+                    itemIds: itemIds,
+                    quantities: quantities
+                })
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã gửi yêu cầu điều chuyển thành công.", "success");
+                    closeTransferModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi gửi yêu cầu: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+
+        function viewTransferDetails(id) {
+            fetch('/api/inventory/transfer/details/' + id)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('detailTitle').innerText = 'Chi Tiết Yêu Cầu TRF-' + data.id;
+                document.getElementById('detailSourceBranch').innerText = data.sourceBranchName;
+                document.getElementById('detailTargetBranch').innerText = data.targetBranchName;
+                document.getElementById('detailRequestDate').innerText = data.requestDate.replace('T', ' ').substring(0, 16);
+                
+                let statusSpan = document.getElementById('detailStatus');
+                statusSpan.innerText = data.status === 'PENDING' ? 'Chờ phê duyệt' : (data.status === 'RECEIVED' ? 'Đã hoàn thành' : 'Đã hủy');
+                statusSpan.className = 'status-badge ' + (data.status === 'PENDING' ? 'badge-orange' : (data.status === 'RECEIVED' ? 'badge-green' : 'badge-red'));
+                
+                let approveRow = document.getElementById('detailApproveDateRow');
+                if (data.approveDate) {
+                    approveRow.style.display = 'block';
+                    document.getElementById('detailApproveDate').innerText = data.approveDate.replace('T', ' ').substring(0, 16);
+                } else {
+                    approveRow.style.display = 'none';
+                }
+
+                let tbody = document.getElementById('detail-items-body');
+                tbody.innerHTML = '';
+                data.items.forEach(item => {
+                    let tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${item.sku}</td>
+                        <td style="font-weight: 600;">${item.name}</td>
+                        <td>${item.unit}</td>
+                        <td style="text-align: right; font-weight: 700;">${item.quantity}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('transferDetailsModal').classList.add('active');
+            })
+            .catch(err => showToast("Lỗi tải chi tiết: " + err, "error"));
+        }
+
+        function closeTransferDetailsModal() {
+            document.getElementById('transferDetailsModal').classList.remove('active');
+        }
+
+        function approveTransfer(id) {
+            if (!confirm("Bạn có đồng ý phê duyệt yêu cầu điều chuyển này? Hành động này sẽ xuất kho nguyên liệu và không thể hoàn tác.")) return;
+            
+            fetch('/api/inventory/transfer/approve/' + id, {
+                method: 'POST'
+            })
+            .then(async response => {
+                if (response.ok) {
+                    showToast("Đã phê duyệt và chuyển kho thành công.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let text = await response.text();
+                    showToast("Lỗi phê duyệt: " + text, "warning");
+                }
+            })
+            .catch(error => showToast("Lỗi hệ thống: " + error, "error"));
+        }
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>

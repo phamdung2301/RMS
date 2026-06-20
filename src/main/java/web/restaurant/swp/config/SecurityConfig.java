@@ -106,6 +106,7 @@ public class SecurityConfig {
                 .requestMatchers("/pos/**").hasAnyRole("ADMIN", "MANAGER", "CASHIER", "EMPLOYEE", "KITCHEN", "CHEF")
                 .requestMatchers("/kds/**").hasAnyRole("ADMIN", "MANAGER", "KITCHEN", "CHEF")
                 .requestMatchers("/schedule/**").hasAnyRole("ADMIN", "MANAGER", "HR", "EMPLOYEE", "CASHIER", "CHEF")
+                .requestMatchers("/hr-management/**", "/api/hr/**").hasAnyRole("ADMIN", "MANAGER", "HR")
                 .requestMatchers("/procurement/**").hasAnyRole("ADMIN", "MANAGER", "PROCUREMENT")
                 .requestMatchers("/inventory/**").hasAnyRole("ADMIN", "MANAGER", "WAREHOUSE", "CHEF")
                 .requestMatchers("/employees/**").authenticated()

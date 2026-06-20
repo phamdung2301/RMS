@@ -36,5 +36,8 @@ import java.util.Optional;
 @Repository
 public interface PromotionRepository extends JpaRepository<Promotion, Long> {
     Optional<Promotion> findByPromoCodeAndIsActiveTrue(String promoCode);
+    Optional<Promotion> findByPromoCodeAndTenantTenantIdAndIsActiveTrue(String promoCode, String tenantId);
     List<Promotion> findByIsActiveTrue();
+    List<Promotion> findByTenantTenantId(String tenantId);
+    List<Promotion> findByTenantTenantIdAndIsActiveTrue(String tenantId);
 }

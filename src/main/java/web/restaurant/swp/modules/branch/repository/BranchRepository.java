@@ -36,4 +36,6 @@ import java.util.Optional;
 @Repository
 public interface BranchRepository extends JpaRepository<Branch, String> {
     List<Branch> findAllByIsActiveTrue();
+    List<Branch> findByTenantTenantId(String tenantId);
+    List<Branch> findByTenantTenantIdAndIsActiveTrue(String tenantId);
 }

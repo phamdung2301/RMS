@@ -24,6 +24,9 @@
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -37,7 +40,20 @@
             <div class="top-bar">
                 <div>
                     <h2 class="page-title">Lịch Làm Việc</h2>
-                    <p style="color: var(--text-muted); font-size: 14px;">Quản lý phân ca và điều phối giờ công nhân sự</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 4px 8px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            <option th:each="b : ${branches}" 
+                                    th:value="${b.branchId}" 
+                                    th:text="${'Chi nhánh: ' + b.name}" 
+                                    th:selected="${b.branchId == activeBranchId}">
+                                Chi nhánh: Trung Tâm
+                            </option>
+                        </select>
+                        <span th:if="${!canSwitchBranch}" style="color: var(--text-muted); font-size: 14px;" 
+                              th:text="${'Chi nhánh hiện tại: ' + (activeBranchName != null ? activeBranchName : 'Toàn hệ thống')}">
+                            Chi nhánh hiện tại: Trung Tâm
+                        </span>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 8px;" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')">
                     <button class="btn btn-secondary" onclick="openShiftTemplateModal()">
@@ -794,6 +810,28 @@
             populateMonthSelectors();
             let todayStr = new Date().toISOString().split('T')[0];
             document.getElementById('day-view-picker').value = todayStr;
+        });
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
         });
     </script>
 </body>

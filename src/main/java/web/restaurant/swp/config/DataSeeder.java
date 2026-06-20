@@ -31,6 +31,7 @@ public class DataSeeder implements CommandLineRunner {
         log.info("Starting database seeding from SQL files...");
 
         List<String> sqlFiles = Arrays.asList(
+            "tenants.sql",
             "roles.sql",
             "branches.sql",
             "users.sql",

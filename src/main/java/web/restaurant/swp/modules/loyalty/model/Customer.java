@@ -24,6 +24,7 @@ import web.restaurant.swp.modules.promotion.service.*;
 import web.restaurant.swp.modules.analytics.service.*;
 import web.restaurant.swp.modules.branch.model.*;
 import web.restaurant.swp.modules.branch.repository.*;
+import web.restaurant.swp.modules.tenant.model.*;
 
 
 import jakarta.persistence.*;
@@ -31,7 +32,7 @@ import lombok.*;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "customers")
+@Table(name = "customers", uniqueConstraints = @UniqueConstraint(columnNames = {"phone", "tenant_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -44,7 +45,7 @@ public class Customer {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String phone;
 
     @Column(name = "birth_date")
@@ -58,4 +59,8 @@ public class Customer {
 
     @Column(name = "total_spent", nullable = false)
     private Double totalSpent = 0.0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id")
+    private Tenant tenant;
 }

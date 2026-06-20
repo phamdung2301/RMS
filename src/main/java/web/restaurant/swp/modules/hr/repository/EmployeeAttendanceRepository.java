@@ -41,4 +41,5 @@ public interface EmployeeAttendanceRepository extends JpaRepository<EmployeeAtte
     List<EmployeeAttendance> findAllByEmployeeIdAndDate(Long employeeId, LocalDate date);
     Optional<EmployeeAttendance> findFirstByEmployeeIdAndClockOutIsNull(Long employeeId);
     Optional<EmployeeAttendance> findByShiftAssignmentId(Long shiftAssignmentId);
+    void deleteByEmployeeId(Long employeeId);
 }

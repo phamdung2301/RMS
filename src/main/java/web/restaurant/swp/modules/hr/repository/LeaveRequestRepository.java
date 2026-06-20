@@ -37,4 +37,5 @@ import java.util.Optional;
 public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long> {
     List<LeaveRequest> findByEmployeeBranchBranchId(String branchId);
     List<LeaveRequest> findByEmployeeId(Long employeeId);
+    void deleteByEmployeeId(Long employeeId);
 }

@@ -24,8 +24,10 @@
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
-                    <li class="nav-item" th:if="${isSuperAdmin}"><a href="#" onclick="openBranchAdminManager()">👥 Đối Tác Chi Nhánh</a></li>
-                    <li class="nav-item" th:if="${isSuperAdmin}"><a href="#" onclick="openBankSettingsModal()">💳 Cấu hình Ngân hàng</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER')"><a href="#" onclick="openOrderLogsModal()">📋 Nhật Ký Gọi Món</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a href="#" onclick="openBranchAdminManager()" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Chi Nhánh & Đối Tác</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a href="#" onclick="openBankSettingsModal()">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -42,10 +44,18 @@
                     <p style="color: var(--text-muted); font-size: 14px;">Xem chi tiết doanh số chuỗi cửa hàng</p>
                 </div>
                 <div class="user-profile">
-                    <select class="form-input" style="padding: 6px 12px; margin-right: 12px;">
-                        <option>Chi nhánh: Trung Tâm</option>
-                        <option>Chi nhánh: Quận 1</option>
+                    <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 6px 12px; margin-right: 12px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer;">
+                        <option th:each="b : ${branches}" 
+                                th:value="${b.branchId}" 
+                                th:text="${'Chi nhánh: ' + b.name}" 
+                                th:selected="${b.branchId == activeBranchId}">
+                            Chi nhánh: Trung Tâm
+                        </option>
                     </select>
+                    <span th:if="${!canSwitchBranch}" style="padding: 6px 12px; margin-right: 12px; color: var(--text-muted); font-size: 14px; background: rgba(255, 255, 255, 0.05); border-radius: 4px;" 
+                          th:text="${activeBranchName != null ? 'Chi nhánh: ' + activeBranchName : 'Toàn hệ thống'}">
+                        Chi nhánh: Trung Tâm
+                    </span>
                     <div class="avatar">AD</div>
                     <span>Quản trị viên</span>
                 </div>
@@ -166,47 +176,64 @@
         }
     </script>
 
-    <!-- Branch Admin Manager Modal (Super Admin only) -->
-    <div class="modal-overlay" id="branchAdminManagerModal" th:if="${isSuperAdmin}">
+    <!-- Branch Admin Manager Modal (Admin only) -->
+    <div class="modal-overlay" id="branchAdminManagerModal" th:if="${isAdmin}">
         <div class="modal-box" style="width: 800px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                <h3 style="font-size: 20px; font-weight: 700;">👥 Quản Lý Đối Tác / Admin Chi Nhánh</h3>
+                <h3 style="font-size: 20px; font-weight: 700;" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác (Chủ Chuỗi)' : '👥 Quản Lý Admin Chi Nhánh'">👥 Quản Lý Đối Tác / Admin Chi Nhánh</h3>
                 <button class="modal-close" onclick="closeBranchAdminManagerModal()">×</button>
             </div>
             
             <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
                 <!-- Add/Edit Admin Form -->
                 <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
-                    <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;" id="adminFormTitle">➕ Thêm Đối Tác / Admin Chi Nhánh</h4>
+                    <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;" id="adminFormTitle" th:text="${isSuperAdmin} ? '➕ Thêm Đối Tác (Chủ Chuỗi Mới)' : '➕ Thêm Admin Chi Nhánh'">➕ Thêm Đối Tác / Admin Chi Nhánh</h4>
                     <input type="hidden" id="editAdminId">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Họ tên đối tác</label>
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;" th:text="${isSuperAdmin} ? 'Họ tên chủ chuỗi (Đối tác)' : 'Họ tên admin chi nhánh'">Họ tên đối tác</label>
                             <input type="text" id="adminName" class="form-input" placeholder="Ví dụ: Nguyễn Văn A..." style="padding: 8px 12px;">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Email (Tên đăng nhập)</label>
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;" th:text="${isSuperAdmin} ? 'Email đối tác (Tài khoản quản trị chuỗi)' : 'Email (Tên đăng nhập)'">Email (Tên đăng nhập)</label>
                             <input type="email" id="adminEmail" class="form-input" placeholder="Ví dụ: partner1@liteflow.com..." style="padding: 8px 12px;">
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Mật khẩu</label>
                             <input type="password" id="adminPassword" class="form-input" placeholder="Bỏ trống nếu không đổi..." style="padding: 8px 12px;">
                         </div>
-                        <div class="form-group" style="margin-bottom: 0;">
+                        <div class="form-group" style="margin-bottom: 0;" th:if="${!isSuperAdmin}">
                             <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Chi nhánh quản lý</label>
-                            <select id="adminBranchId" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <select id="adminBranchId" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px;" onchange="toggleNewBranchFields(this.value)">
                                 <option value="">Hệ thống (Không chi nhánh)</option>
+                                <option value="_NEW_">➕ Tạo chi nhánh mới...</option>
                                 <option th:each="b : ${branches}" th:value="${b.branchId}" th:text="${b.name}">Trung Tâm</option>
                             </select>
                         </div>
+                        <input type="hidden" id="adminBranchId" th:if="${isSuperAdmin}" value="_NEW_">
+                        <input type="hidden" id="adminRoleName" value="ADMIN">
+                    </div>
+                    <div id="newBranchFields" th:style="${isSuperAdmin} ? 'display: grid; grid-template-columns: 1fr 2fr 2fr 1fr; gap: 12px; margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);' : 'display: none; grid-template-columns: 1fr 2fr 2fr 1fr; gap: 12px; margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);'">
+                        <div style="grid-column: span 4; font-size: 13px; font-weight: 600; color: #a5b4fc; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            🏢 <span th:text="${isSuperAdmin} ? 'Thông tin chi nhánh đầu tiên của chuỗi (Bắt buộc)' : 'Thông tin chi nhánh mới'">Thông tin chi nhánh mới</span>
+                        </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Vai trò</label>
-                            <select id="adminRoleName" class="form-input" style="padding: 8px 12px; background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 8px;">
-                                <option value="ADMIN">ADMIN (Quản trị chi nhánh)</option>
-                                <option value="MANAGER">MANAGER (Quản lý chi nhánh)</option>
-                            </select>
+                            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Mã chi nhánh mới</label>
+                            <input type="text" id="newBranchId" class="form-input" placeholder="Ví dụ: 31-NguyenTriPhuong" style="padding: 6px 10px; font-size: 12px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Tên chi nhánh mới</label>
+                            <input type="text" id="newBranchName" class="form-input" placeholder="Ví dụ: Chi nhánh Nguyễn Tri Phương" style="padding: 6px 10px; font-size: 12px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Địa chỉ chi nhánh mới</label>
+                            <input type="text" id="newBranchAddress" class="form-input" placeholder="Ví dụ: 31 Nguyễn Tri Phương, Hải Châu, Đà Nẵng" style="padding: 6px 10px; font-size: 12px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Số điện thoại</label>
+                            <input type="text" id="newBranchPhone" class="form-input" placeholder="Ví dụ: 02363123456" style="padding: 6px 10px; font-size: 12px;">
                         </div>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -215,14 +242,14 @@
                             <label for="adminIsActive" style="font-size: 13px; font-weight: 500; cursor: pointer;">Kích hoạt tài khoản</label>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-primary" onclick="submitAdminForm()" style="padding: 8px 16px; height: 38px;">Lưu đối tác</button>
+                            <button class="btn btn-primary" onclick="submitAdminForm()" style="padding: 8px 16px; height: 38px;" th:text="${isSuperAdmin} ? 'Lưu đối tác' : 'Lưu admin'">Lưu đối tác</button>
                             <button class="btn btn-secondary" id="cancelAdminEditBtn" onclick="resetAdminForm()" style="padding: 8px 12px; height: 38px; display: none;">Hủy</button>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Admins List Table -->
-                <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">📋 Danh sách đối tác / Admin chi nhánh</h4>
+                <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;" th:text="${isSuperAdmin} ? '📋 Danh sách đối tác (Chủ chuỗi)' : '📋 Danh sách Admin chi nhánh'">📋 Danh sách đối tác / Admin chi nhánh</h4>
                 <div class="table-responsive">
                     <table class="premium-table" style="width: 100%; font-size: 13px;">
                         <thead>
@@ -244,7 +271,9 @@
         </div>
     </div>
 
-    <script th:inline="javascript" th:if="${isSuperAdmin}">
+    <script th:inline="javascript" th:if="${isAdmin}">
+        const isSuperAdmin = [[${isSuperAdmin}]];
+
         function openBranchAdminManager() {
             document.getElementById('branchAdminManagerModal').classList.add('active');
             loadBranchAdmins();
@@ -284,15 +313,25 @@
                 });
         }
 
+        function toggleNewBranchFields(val) {
+            let container = document.getElementById('newBranchFields');
+            if (val === '_NEW_') {
+                container.style.display = 'grid';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
         function editBranchAdmin(id, name, email, branchId, roleName, isActive) {
             document.getElementById('editAdminId').value = id;
             document.getElementById('adminName').value = name;
             document.getElementById('adminEmail').value = email;
             document.getElementById('adminPassword').placeholder = "Nhập mật khẩu mới nếu muốn đổi...";
-            document.getElementById('adminBranchId').value = branchId;
+            document.getElementById('adminBranchId').value = branchId || "";
+            toggleNewBranchFields(branchId || "");
             document.getElementById('adminRoleName').value = roleName;
             document.getElementById('adminIsActive').checked = isActive;
-            document.getElementById('adminFormTitle').innerText = "✏️ Cập nhật Đối Tác #" + id;
+            document.getElementById('adminFormTitle').innerText = isSuperAdmin ? "✏️ Cập nhật Đối Tác #" + id : "✏️ Cập nhật Admin Chi Nhánh #" + id;
             document.getElementById('cancelAdminEditBtn').style.display = 'inline-flex';
         }
 
@@ -302,10 +341,21 @@
             document.getElementById('adminEmail').value = "";
             document.getElementById('adminPassword').value = "";
             document.getElementById('adminPassword').placeholder = "Mật khẩu cho tài khoản mới...";
-            document.getElementById('adminBranchId').value = "";
+            if (isSuperAdmin) {
+                document.getElementById('adminBranchId').value = "_NEW_";
+                toggleNewBranchFields("_NEW_");
+                document.getElementById('adminFormTitle').innerText = "➕ Thêm Đối Tác (Chủ Chuỗi Mới)";
+            } else {
+                document.getElementById('adminBranchId').value = "";
+                toggleNewBranchFields("");
+                document.getElementById('adminFormTitle').innerText = "➕ Thêm Admin Chi Nhánh";
+            }
+            document.getElementById('newBranchId').value = "";
+            document.getElementById('newBranchName').value = "";
+            document.getElementById('newBranchAddress').value = "";
+            document.getElementById('newBranchPhone').value = "";
             document.getElementById('adminRoleName').value = "ADMIN";
             document.getElementById('adminIsActive').checked = true;
-            document.getElementById('adminFormTitle').innerText = "➕ Thêm Đối Tác / Admin Chi Nhánh";
             document.getElementById('cancelAdminEditBtn').style.display = 'none';
         }
 
@@ -327,9 +377,30 @@
                 return;
             }
 
+            let newBranchId = "";
+            let newBranchName = "";
+            let newBranchAddress = "";
+            let newBranchPhone = "";
+
+            if (branchId === '_NEW_') {
+                newBranchId = document.getElementById('newBranchId').value.trim();
+                newBranchName = document.getElementById('newBranchName').value.trim();
+                newBranchAddress = document.getElementById('newBranchAddress').value.trim();
+                newBranchPhone = document.getElementById('newBranchPhone').value.trim();
+
+                if (!newBranchId || !newBranchName || !newBranchAddress) {
+                    showToast("Vui lòng nhập đầy đủ mã, tên và địa chỉ chi nhánh mới.", "error");
+                    return;
+                }
+            }
+
             let url = id 
                 ? `/api/pos/branch-admins/update?id=${id}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&password=${encodeURIComponent(password)}&branchId=${branchId}&roleName=${roleName}&isActive=${isActive}`
                 : `/api/pos/branch-admins/add?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&password=${encodeURIComponent(password)}&branchId=${branchId}&roleName=${roleName}`;
+
+            if (branchId === '_NEW_') {
+                url += `&newBranchId=${encodeURIComponent(newBranchId)}&newBranchName=${encodeURIComponent(newBranchName)}&newBranchAddress=${encodeURIComponent(newBranchAddress)}&newBranchPhone=${encodeURIComponent(newBranchPhone)}`;
+            }
 
             fetch(url, { method: 'POST' })
                 .then(res => {
@@ -358,7 +429,7 @@
     </script>
 
     <!-- Bank Settings Modal (Super Admin only) -->
-    <div class="modal-overlay" id="bankSettingsModal" th:if="${isSuperAdmin}">
+    <div class="modal-overlay" id="bankSettingsModal" th:if="${isAdmin}">
         <div class="modal-box" style="width: 500px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                 <h3 style="font-size: 20px; font-weight: 700;">💳 Cấu hình Tài khoản Ngân hàng</h3>
@@ -403,7 +474,7 @@
         </div>
     </div>
 
-    <script th:inline="javascript" th:if="${isSuperAdmin}">
+    <script th:inline="javascript" th:if="${isAdmin}">
         function openBankSettingsModal() {
             document.getElementById('bankSettingsModal').classList.add('active');
             loadBankSettings();
@@ -453,6 +524,16 @@
                 })
                 .catch(err => showToast("Lỗi: " + err.message, "error"));
         }
+
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const openParam = urlParams.get('open');
+            if (openParam === 'branchAdmins') {
+                openBranchAdminManager();
+            } else if (openParam === 'bankSettings') {
+                openBankSettingsModal();
+            }
+        });
     </script>
 
     <!-- Floating Draggable Chatbot Button (LF Sparkle AI Branding) -->
@@ -698,6 +779,135 @@
                 }
             });
         })();
+
+        // Order Activity Logs Logic
+        function openOrderLogsModal() {
+            document.getElementById('orderLogsModal').classList.add('active');
+            loadOrderLogs('day');
+        }
+
+        function closeOrderLogsModal() {
+            document.getElementById('orderLogsModal').classList.remove('active');
+        }
+
+        function loadOrderLogs(range) {
+            const ranges = ['day', 'week', 'month'];
+            ranges.forEach(r => {
+                const btn = document.getElementById('btnLog' + r.charAt(0).toUpperCase() + r.slice(1));
+                if (btn) {
+                    if (r === range) {
+                        btn.classList.remove('btn-secondary');
+                        btn.classList.add('btn-primary');
+                    } else {
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('btn-secondary');
+                    }
+                }
+            });
+
+            let rangeText = "Hôm Nay";
+            if (range === 'week') rangeText = "7 Ngày Qua";
+            else if (range === 'month') rangeText = "Tháng Này";
+            document.getElementById('lblLogRangeText').innerText = rangeText;
+
+            fetch('/api/pos/order-logs?range=' + range)
+                .then(res => res.json())
+                .then(logs => {
+                    let listHtml = "";
+                    if (logs.length === 0) {
+                        listHtml = `<tr><td colspan="5" style="text-align:center; padding: 16px; color: var(--text-muted);">Không tìm thấy nhật ký hoạt động nào trong khoảng thời gian này.</td></tr>`;
+                    } else {
+                        logs.forEach(log => {
+                            let dateObj = new Date(log.createdAt);
+                            let formattedTime = dateObj.toLocaleDateString('vi-VN', {
+                                day: '2-digit', month: '2-digit', year: 'numeric'
+                            }) + ' ' + dateObj.toLocaleTimeString('vi-VN', {
+                                hour: '2-digit', minute: '2-digit', second: '2-digit'
+                            });
+
+                            let actionBadgeClass = "badge-orange";
+                            if (log.action === 'BILL_PAYMENT') actionBadgeClass = "badge-green";
+                            else if (log.action === 'OPEN_SESSION') actionBadgeClass = "badge-blue";
+
+                            listHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px; font-family: monospace;">${formattedTime}</td>
+                                    <td style="padding: 10px; font-weight: 600;">${log.userName}</td>
+                                    <td style="padding: 10px;"><span class="status-badge ${actionBadgeClass}" style="padding: 2px 8px; font-size:11px;">${log.action}</span></td>
+                                    <td style="padding: 10px; line-height: 1.4;">${log.description}</td>
+                                    <td style="padding: 10px; font-family: monospace; color: var(--text-muted);">${log.ipAddress}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    document.getElementById('orderLogsList').innerHTML = listHtml;
+                })
+                .catch(err => {
+                    showToast("Lỗi khi tải nhật ký hoạt động: " + err.message, "error");
+                });
+        }
+    </script>
+
+    <!-- Order Logs Modal (Thanh toán & Gọi món) -->
+    <div class="modal-overlay" id="orderLogsModal">
+        <div class="modal-box" style="width: 850px; max-width: 95vw; display: flex; flex-direction: column; max-height: 90vh;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="font-size: 20px; font-weight: 700;">📋 Nhật Ký Hoạt Động Gọi Món &amp; Thanh Toán</h3>
+                <button class="modal-close" onclick="closeOrderLogsModal()">×</button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" id="btnLogDay" onclick="loadOrderLogs('day')">Hôm Nay</button>
+                    <button class="btn btn-secondary" id="btnLogWeek" onclick="loadOrderLogs('week')">Tuần Này</button>
+                    <button class="btn btn-secondary" id="btnLogMonth" onclick="loadOrderLogs('month')">Tháng Này</button>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted);">
+                    Lọc theo: <span id="lblLogRangeText" style="font-weight: 600; color: var(--color-primary);">Hôm Nay</span>
+                </div>
+            </div>
+            
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 4px;">
+                <div class="table-responsive">
+                    <table class="premium-table" style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 8px; width: 160px;">Thời gian</th>
+                                <th style="padding: 8px; width: 140px;">Nhân viên</th>
+                                <th style="padding: 8px; width: 130px;">Hành động</th>
+                                <th style="padding: 8px;">Chi tiết</th>
+                                <th style="padding: 8px; width: 110px;">Địa chỉ IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderLogsList">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>

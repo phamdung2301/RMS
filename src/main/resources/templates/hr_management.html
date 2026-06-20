@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Nhân Sự - LiteFlow</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .portal-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .tab-btn.active-tab {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+        .tab-btn:hover:not(.active-tab) {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .form-group select {
+            width: 100%;
+            background: var(--bg-surface);
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+    </style>
+    <script th:src="@{/js/toast.js}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LF</div>
+                    <div class="brand-name">LiteFlow POS</div>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
+                    <li class="nav-item" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item active" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
+                </ul>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Quản Lý Nhân Sự</h2>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 4px 8px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            <option th:each="b : ${branches}" 
+                                    th:value="${b.branchId}" 
+                                    th:text="${'Chi nhánh: ' + b.name}" 
+                                    th:selected="${b.branchId == activeBranchId}">
+                                Chi nhánh: Trung Tâm
+                            </option>
+                        </select>
+                        <span th:if="${!canSwitchBranch}" style="color: var(--text-muted); font-size: 14px;" 
+                              th:text="${activeBranchName != null ? 'Chi nhánh: ' + activeBranchName : 'Toàn hệ thống'}">
+                            Chi nhánh: Quận 1
+                        </span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="openAddEmployeeModal()">
+                    ➕ Thêm Nhân Viên Mới
+                </button>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="portal-tabs">
+                <button class="tab-btn active-tab" id="btn-tab-employees" onclick="switchTab('employees')">👥 Danh Sách Nhân Viên</button>
+                <button class="tab-btn" id="btn-tab-leaves" onclick="switchTab('leaves')">📝 Đơn Xin Nghỉ Phép</button>
+                <button class="tab-btn" id="btn-tab-forgot" onclick="switchTab('forgot')">⏰ Đơn Bổ Sung Công</button>
+            </div>
+
+            <!-- Tab 1: Employees List -->
+            <div id="tab-employees-content" class="tab-content active glass-panel">
+                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">👥 Danh Sách Nhân Viên</h4>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>HỌ TÊN</th>
+                                <th>EMAIL / TÀI KHOẢN</th>
+                                <th>VAI TRÒ</th>
+                                <th>BỘ PHẬN</th>
+                                <th>CHỨC VỤ</th>
+                                <th>LƯƠNG CƠ BẢN</th>
+                                <th>LOẠI LƯƠNG</th>
+                                <th>CHI NHÁNH</th>
+                                <th style="text-align: right;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="emp : ${employees}">
+                                <td th:text="${emp.user.name}" style="font-weight: 600;">Nguyễn Văn A</td>
+                                <td th:text="${emp.user.email}">a.nguyen@liteflow.com</td>
+                                <td>
+                                    <span class="status-badge badge-blue" 
+                                          th:text="${#strings.listJoin(emp.user.roles.![name], ', ')}">EMPLOYEE</span>
+                                </td>
+                                <td th:text="${emp.department}">Phục vụ</td>
+                                <td th:text="${emp.title}">Nhân viên</td>
+                                <td th:text="${'₫' + #numbers.formatDecimal(emp.baseSalary, 0, 'COMMA', 0, 'POINT')}">30,000đ</td>
+                                <td th:text="${emp.salaryType}">Hourly</td>
+                                <td th:text="${emp.branch != null ? emp.branch.name : 'Hệ Thống'}">Quận 1</td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;"
+                                                th:data-id="${emp.id}"
+                                                th:data-name="${emp.user.name}"
+                                                th:data-email="${emp.user.email}"
+                                                th:data-role-id="${emp.user.roles.iterator().next().id}"
+                                                th:data-dept="${emp.department}"
+                                                th:data-title="${emp.title}"
+                                                th:data-salary="${emp.baseSalary}"
+                                                th:data-salary-type="${emp.salaryType}"
+                                                th:data-branch-id="${emp.branch != null ? emp.branch.branchId : ''}"
+                                                onclick="onEditEmployeeClick(this)">
+                                            ✏️ Sửa
+                                        </button>
+                                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;"
+                                                th:data-id="${emp.id}"
+                                                onclick="deleteEmployee(this.getAttribute('data-id'))"
+                                                th:disabled="${currentUser.id == emp.user.id}">
+                                            🗑️ Xóa
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(employees)}">
+                                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 15px;">Chưa có nhân viên nào.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 2: Leave Requests -->
+            <div id="tab-leaves-content" class="tab-content glass-panel">
+                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">📝 Danh Sách Đơn Nghỉ Phép</h4>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>NHÂN VIÊN</th>
+                                <th>CHI NHÁNH</th>
+                                <th>NGÀY BẮT ĐẦU</th>
+                                <th>NGÀY KẾ THÚC</th>
+                                <th>LOẠI PHÉP</th>
+                                <th>LÝ DO</th>
+                                <th>THỜI GIAN GỬI</th>
+                                <th>TRẠNG THÁI</th>
+                                <th style="text-align: right;">PHÊ DUYỆT</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="r : ${leaveRequests}">
+                                <td th:text="${r.employee.user.name}" style="font-weight: 600;">Nguyễn Văn A</td>
+                                <td th:text="${r.employee.branch != null ? r.employee.branch.name : 'Hệ thống'}">Quận 1</td>
+                                <td th:text="${r.startDate}">01/06/2026</td>
+                                <td th:text="${r.endDate}">02/06/2026</td>
+                                <td th:text="${r.leaveType == 'ANNUAL' ? 'Phép năm (ANNUAL)' : (r.leaveType == 'SICK' ? 'Nghỉ ốm (SICK)' : (r.leaveType == 'UNPAID' ? 'Nghỉ không lương (UNPAID)' : r.leaveType))}">Phép năm</td>
+                                <td th:text="${r.reason}">Nghỉ phép cá nhân</td>
+                                <td th:text="${#temporals.format(r.createdAt, 'dd/MM/yyyy HH:mm:ss')}">10/06/2026 14:30:22</td>
+                                <td>
+                                    <span th:class="${r.status == 'APPROVED' ? 'status-badge badge-green' : (r.status == 'PENDING' ? 'status-badge badge-orange' : 'status-badge badge-red')}" 
+                                          th:text="${r.status}">APPROVED</span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 8px; justify-content: flex-end;" th:if="${r.status == 'PENDING'}">
+                                        <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" th:data-id="${r.id}" onclick="approveLeave(this.getAttribute('data-id'))">✔️ Duyệt</button>
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" th:data-id="${r.id}" onclick="rejectLeave(this.getAttribute('data-id'))">❌ Từ chối</button>
+                                    </div>
+                                    <span style="color: var(--text-muted); font-size: 13px;" th:if="${r.status != 'PENDING'}">-</span>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(leaveRequests)}">
+                                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 15px;">Chưa có yêu cầu nghỉ phép nào.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Forgot Clock Requests -->
+            <div id="tab-forgot-content" class="tab-content glass-panel">
+                <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">⏰ Danh Sách Yêu Cầu Bổ Sung Công</h4>
+                <div class="table-responsive">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>NHÂN VIÊN</th>
+                                <th>CHI NHÁNH</th>
+                                <th>NGÀY CẦN BỔ SUNG</th>
+                                <th>LOẠI CHẤM CÔNG</th>
+                                <th>GIỜ ĐỀ NGHỊ</th>
+                                <th>LÝ DO</th>
+                                <th>THỜI GIAN GỬI</th>
+                                <th>TRẠNG THÁI</th>
+                                <th style="text-align: right;">PHÊ DUYỆT</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="f : ${forgotRequests}">
+                                <td th:text="${f.employee.user.name}" style="font-weight: 600;">Nguyễn Văn A</td>
+                                <td th:text="${f.employee.branch != null ? f.employee.branch.name : 'Hệ thống'}">Quận 1</td>
+                                <td th:text="${f.date}">01/06/2026</td>
+                                <td th:text="${f.clockType == 'CLOCK_IN' ? 'Check In' : 'Check Out'}">Check In</td>
+                                <td th:text="${f.timeProposed}">08:00</td>
+                                <td th:text="${f.reason}">Quên checkin</td>
+                                <td th:text="${#temporals.format(f.createdAt, 'dd/MM/yyyy HH:mm:ss')}">10/05/2026 09:15:00</td>
+                                <td>
+                                    <span th:class="${f.status == 'APPROVED' ? 'status-badge badge-green' : (f.status == 'PENDING' ? 'status-badge badge-orange' : 'status-badge badge-red')}" 
+                                          th:text="${f.status}">PENDING</span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <div style="display: flex; gap: 8px; justify-content: flex-end;" th:if="${f.status == 'PENDING'}">
+                                        <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" th:data-id="${f.id}" onclick="approveForgot(this.getAttribute('data-id'))">✔️ Duyệt</button>
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" th:data-id="${f.id}" onclick="rejectForgot(this.getAttribute('data-id'))">❌ Từ chối</button>
+                                    </div>
+                                    <span style="color: var(--text-muted); font-size: 13px;" th:if="${f.status != 'PENDING'}">-</span>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(forgotRequests)}">
+                                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 15px;">Chưa có yêu cầu bổ sung công nào.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Employee Modal -->
+    <div class="modal-overlay" id="employeeModal">
+        <div class="modal-box" style="width: 600px; max-width: 95vw;">
+            <div class="modal-header">
+                <h3 id="modalTitle">Thêm Nhân Viên Mới</h3>
+                <button class="modal-close" onclick="closeEmployeeModal()">&times;</button>
+            </div>
+            <form id="employeeForm" onsubmit="submitEmployeeForm(event)">
+                <input type="hidden" id="employeeId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Họ và Tên</label>
+                        <input type="text" id="empName" class="form-input" required placeholder="Ví dụ: Nguyễn Văn A">
+                    </div>
+                    <div class="form-group">
+                        <label>Email (Tài khoản đăng nhập)</label>
+                        <input type="email" id="empEmail" class="form-input" required placeholder="Ví dụ: nva@liteflow.com">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mật Khẩu</label>
+                        <input type="password" id="empPassword" class="form-input" placeholder="Mật khẩu đăng nhập">
+                        <small style="color: var(--text-muted); font-size: 11px;" id="passwordHelp">Bắt buộc đối với nhân viên mới.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Vai Trò Hệ Thống</label>
+                        <select id="empRole" class="form-input" required>
+                            <option th:each="r : ${roles}" th:value="${r.id}" th:text="${r.name}">EMPLOYEE</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Bộ Phận (Department)</label>
+                        <input type="text" id="empDepartment" class="form-input" required placeholder="Ví dụ: Bàn, Bếp, Thu ngân">
+                    </div>
+                    <div class="form-group">
+                        <label>Chức Vụ (Title)</label>
+                        <input type="text" id="empTitle" class="form-input" required placeholder="Ví dụ: Phục vụ, Đầu bếp chính">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Lương Cơ Bản</label>
+                        <input type="number" id="empBaseSalary" class="form-input" required min="0" placeholder="Ví dụ: 30000">
+                    </div>
+                    <div class="form-group">
+                        <label>Loại Tính Lương</label>
+                        <select id="empSalaryType" class="form-input" required>
+                            <option value="Fixed">Lương Cố Định (Fixed)</option>
+                            <option value="Hourly">Lương Theo Giờ (Hourly)</option>
+                            <option value="PerShift">Lương Theo Ca (PerShift)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;" th:if="${currentUser.branch == null}">
+                    <label>Chi Nhánh Làm Việc</label>
+                    <select id="empBranchId" class="form-input">
+                        <option value="">Hệ Thống (Không chi nhánh)</option>
+                        <option th:each="b : ${branches}" th:value="${b.branchId}" th:text="${b.name}">Chi nhánh Trung Tâm</option>
+                    </select>
+                </div>
+                <input type="hidden" id="empBranchHidden" th:if="${currentUser.branch != null}" th:value="${currentUser.branch.branchId}">
+                
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeEmployeeModal()">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu Nhân Viên</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function onEditEmployeeClick(button) {
+            const id = button.getAttribute('data-id');
+            const name = button.getAttribute('data-name');
+            const email = button.getAttribute('data-email');
+            const roleId = button.getAttribute('data-role-id');
+            const dept = button.getAttribute('data-dept');
+            const title = button.getAttribute('data-title');
+            const salary = button.getAttribute('data-salary');
+            const salaryType = button.getAttribute('data-salary-type');
+            const branchId = button.getAttribute('data-branch-id');
+            
+            openEditEmployeeModal(id, name, email, roleId, dept, title, salary, salaryType, branchId);
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.getElementById('btn-tab-' + tabName).classList.add('active-tab');
+            document.getElementById('tab-' + tabName + '-content').classList.add('active');
+        }
+
+        function openAddEmployeeModal() {
+            document.getElementById('employeeId').value = '';
+            document.getElementById('empName').value = '';
+            document.getElementById('empEmail').value = '';
+            document.getElementById('empEmail').disabled = false;
+            document.getElementById('empPassword').value = '';
+            document.getElementById('empPassword').required = true;
+            document.getElementById('passwordHelp').innerText = 'Bắt buộc đối với nhân viên mới.';
+            document.getElementById('empRole').selectedIndex = 0;
+            document.getElementById('empDepartment').value = '';
+            document.getElementById('empTitle').value = '';
+            document.getElementById('empBaseSalary').value = '';
+            document.getElementById('empSalaryType').value = 'Fixed';
+            
+            let branchSel = document.getElementById('empBranchId');
+            if (branchSel) {
+                branchSel.value = '';
+            }
+
+            document.getElementById('modalTitle').innerText = 'Thêm Nhân Viên Mới';
+            document.getElementById('employeeModal').classList.add('active');
+        }
+
+        function openEditEmployeeModal(id, name, email, roleId, dept, title, salary, salaryType, branchId) {
+            document.getElementById('employeeId').value = id;
+            document.getElementById('empName').value = name;
+            document.getElementById('empEmail').value = email;
+            document.getElementById('empEmail').disabled = true; // Email changes not recommended
+            document.getElementById('empPassword').value = '';
+            document.getElementById('empPassword').required = false;
+            document.getElementById('passwordHelp').innerText = 'Để trống nếu không muốn đổi mật khẩu.';
+            document.getElementById('empRole').value = roleId;
+            document.getElementById('empDepartment').value = dept;
+            document.getElementById('empTitle').value = title;
+            document.getElementById('empBaseSalary').value = salary;
+            document.getElementById('empSalaryType').value = salaryType;
+
+            let branchSel = document.getElementById('empBranchId');
+            if (branchSel) {
+                branchSel.value = branchId || '';
+            }
+
+            document.getElementById('modalTitle').innerText = 'Cập Nhật Thông Tin Nhân Viên';
+            document.getElementById('employeeModal').classList.add('active');
+        }
+
+        function closeEmployeeModal() {
+            document.getElementById('employeeModal').classList.remove('active');
+            document.getElementById('employeeForm').reset();
+        }
+
+        function submitEmployeeForm(event) {
+            event.preventDefault();
+            const id = document.getElementById('employeeId').value;
+            const name = document.getElementById('empName').value.trim();
+            const email = document.getElementById('empEmail').value.trim();
+            const password = document.getElementById('empPassword').value;
+            const roleId = document.getElementById('empRole').value;
+            const dept = document.getElementById('empDepartment').value.trim();
+            const title = document.getElementById('empTitle').value.trim();
+            const salary = document.getElementById('empBaseSalary').value;
+            const salaryType = document.getElementById('empSalaryType').value;
+            
+            let branchId = '';
+            const branchSel = document.getElementById('empBranchId');
+            if (branchSel) {
+                branchId = branchSel.value;
+            } else {
+                const branchHidden = document.getElementById('empBranchHidden');
+                if (branchHidden) branchId = branchHidden.value;
+            }
+
+            const isEdit = id !== '';
+            const url = isEdit ? '/api/hr/employees/update' : '/api/hr/employees/add';
+            
+            let bodyParams = new URLSearchParams();
+            if (isEdit) bodyParams.append('id', id);
+            bodyParams.append('name', name);
+            bodyParams.append('email', email);
+            bodyParams.append('password', password);
+            bodyParams.append('roleId', roleId);
+            bodyParams.append('department', dept);
+            bodyParams.append('title', title);
+            bodyParams.append('baseSalary', salary);
+            bodyParams.append('salaryType', salaryType);
+            bodyParams.append('branchId', branchId);
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: bodyParams
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast(isEdit ? "Cập nhật nhân viên thành công!" : "Thêm nhân viên thành công!", "success");
+                    closeEmployeeModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            })
+            .catch(err => {
+                showToast("Lỗi kết nối máy chủ!", "error");
+            });
+        }
+
+        function deleteEmployee(id) {
+            if (!confirm("Bạn có chắc chắn muốn xóa nhân viên này? Thao tác này cũng sẽ xóa tài khoản đăng nhập và tất cả dữ liệu lịch sử liên quan!")) {
+                return;
+            }
+            fetch('/api/hr/employees/delete/' + id, { method: 'POST' })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã xóa nhân viên thành công!", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi khi xóa: " + text, "error");
+                }
+            });
+        }
+
+        function approveLeave(id) {
+            fetch('/api/hr/leave-requests/approve/' + id, { method: 'POST' })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã phê duyệt nghỉ phép thành công!", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            });
+        }
+
+        function rejectLeave(id) {
+            if (!confirm("Bạn có chắc chắn muốn từ chối đơn xin nghỉ này?")) return;
+            fetch('/api/hr/leave-requests/reject/' + id, { method: 'POST' })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã từ chối đơn xin nghỉ phép.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            });
+        }
+
+        function approveForgot(id) {
+            fetch('/api/hr/forgot-clock/approve/' + id, { method: 'POST' })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã duyệt bổ sung công thành công!", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            });
+        }
+
+        function rejectForgot(id) {
+            if (!confirm("Bạn có chắc chắn muốn từ chối yêu cầu này?")) return;
+            fetch('/api/hr/forgot-clock/reject/' + id, { method: 'POST' })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Đã từ chối đơn bổ sung công.", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            });
+        }
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

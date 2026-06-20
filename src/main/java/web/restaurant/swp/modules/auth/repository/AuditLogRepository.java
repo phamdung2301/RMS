@@ -36,6 +36,14 @@ import java.util.Optional;
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     List<AuditLog> findAllByOrderByCreatedAtDesc();
+
+    @Query("SELECT a FROM AuditLog a WHERE a.createdAt >= :start AND a.createdAt <= :end AND a.action IN :actions AND (:branchId IS NULL OR a.branchId = :branchId) ORDER BY a.createdAt DESC")
+    List<AuditLog> findLogsForPOS(
+        @org.springframework.data.repository.query.Param("start") java.time.LocalDateTime start, 
+        @org.springframework.data.repository.query.Param("end") java.time.LocalDateTime end, 
+        @org.springframework.data.repository.query.Param("actions") List<String> actions, 
+        @org.springframework.data.repository.query.Param("branchId") String branchId
+    );
 }
 
 // --- BRANCH OPERATIONS ---

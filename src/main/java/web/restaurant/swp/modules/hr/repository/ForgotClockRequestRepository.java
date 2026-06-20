@@ -37,4 +37,5 @@ import java.util.Optional;
 public interface ForgotClockRequestRepository extends JpaRepository<ForgotClockRequest, Long> {
     List<ForgotClockRequest> findByEmployeeBranchBranchId(String branchId);
     List<ForgotClockRequest> findByEmployeeId(Long employeeId);
+    void deleteByEmployeeId(Long employeeId);
 }

@@ -38,4 +38,5 @@ public interface EmployeeShiftAssignmentRepository extends JpaRepository<Employe
     List<EmployeeShiftAssignment> findByEmployeeBranchBranchIdAndDateBetween(String branchId, LocalDate start, LocalDate end);
     List<EmployeeShiftAssignment> findByEmployeeIdAndDate(Long employeeId, LocalDate date);
     List<EmployeeShiftAssignment> findByEmployeeIdAndDateBetween(Long employeeId, LocalDate start, LocalDate end);
+    void deleteByEmployeeId(Long employeeId);
 }

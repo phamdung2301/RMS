@@ -60,4 +60,9 @@ public class LeaveRequest {
     @Builder.Default
     @Column(nullable = false)
     private String status = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @Builder.Default
+    private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
 }
+

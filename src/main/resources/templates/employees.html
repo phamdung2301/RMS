@@ -24,6 +24,9 @@
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
                     <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
                     <li class="nav-item active" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
+                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
+                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
                 </ul>
             </div>
             <form th:action="@{/logout}" method="post">
@@ -37,7 +40,20 @@
             <div class="top-bar">
                 <div>
                     <h2 class="page-title">Portal Nhân Viên</h2>
-                    <p style="color: var(--text-muted); font-size: 14px;">Chấm công, quản lý lịch ca và gửi đơn từ</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <select th:if="${canSwitchBranch}" id="globalBranchSwitcher" class="form-input" style="padding: 4px 8px; background-color: var(--card-bg, #1a1b23); color: white; border: 1px solid var(--border-color, #2d2e3d); border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            <option th:each="b : ${branches}" 
+                                    th:value="${b.branchId}" 
+                                    th:text="${'Chi nhánh: ' + b.name}" 
+                                    th:selected="${b.branchId == activeBranchId}">
+                                Chi nhánh: Trung Tâm
+                            </option>
+                        </select>
+                        <span th:if="${!canSwitchBranch}" style="color: var(--text-muted); font-size: 14px;" 
+                              th:text="${'Chi nhánh hiện tại: ' + (activeBranchName != null ? activeBranchName : 'Toàn hệ thống')}">
+                            Chi nhánh hiện tại: Trung Tâm
+                        </span>
+                    </div>
                 </div>
                 <div class="user-profile">
                     <div class="avatar" th:text="${employee != null ? #strings.substring(employee.user.name, 0, 2).toUpperCase() : 'EM'}">EM</div>
@@ -85,10 +101,10 @@
                 <div style="display: flex; flex-direction: column; gap: 24px;">
                     <!-- Request buttons -->
                     <div class="glass-panel" style="display: flex; gap: 16px;">
-                        <button class="btn btn-primary" onclick="showToast('Mở form xin nghỉ phép trực tuyến...', 'info')">
+                        <button class="btn btn-primary" onclick="openLeaveModal()">
                             📝 Gửi Đơn Xin Nghỉ Phép
                         </button>
-                        <button class="btn btn-secondary" onclick="showToast('Mở form báo quên chấm công (Forgot Clock)...', 'info')">
+                        <button class="btn btn-secondary" onclick="openForgotClockModal()">
                             ⏰ Xin Bổ Sung Công
                         </button>
                     </div>
@@ -130,6 +146,7 @@
                                         <th>NGÀY KẾ THÚC</th>
                                         <th>LOẠI NGHỈ</th>
                                         <th>LÝ DO</th>
+                                        <th>THỜI GIAN GỬI</th>
                                         <th>TRẠNG THÁI</th>
                                     </tr>
                                 </thead>
@@ -137,14 +154,51 @@
                                     <tr th:each="r : ${leaveRequests}">
                                         <td th:text="${r.startDate}">01/06/2026</td>
                                         <td th:text="${r.endDate}">02/06/2026</td>
-                                        <td th:text="${r.leaveType}">Phép năm có lương</td>
+                                        <td th:text="${r.leaveType == 'ANNUAL' ? 'Phép năm (ANNUAL)' : (r.leaveType == 'SICK' ? 'Nghỉ ốm (SICK)' : (r.leaveType == 'UNPAID' ? 'Nghỉ không lương (UNPAID)' : r.leaveType))}">Phép năm</td>
                                         <td th:text="${r.reason}">Nghỉ phép thường niên</td>
+                                        <td th:text="${#temporals.format(r.createdAt, 'dd/MM/yyyy HH:mm:ss')}">10/06/2026 14:30:22</td>
                                         <td>
-                                            <span class="status-badge badge-green" th:text="${r.status}">APPROVED</span>
+                                            <span th:class="${r.status == 'APPROVED' ? 'status-badge badge-green' : (r.status == 'PENDING' ? 'status-badge badge-orange' : 'status-badge badge-red')}" 
+                                                  th:text="${r.status}">APPROVED</span>
                                         </td>
                                     </tr>
                                     <tr th:if="${#lists.isEmpty(leaveRequests)}">
-                                        <td colspan="5" style="text-align: center; color: var(--text-muted);">Không có dữ liệu đơn phép.</td>
+                                        <td colspan="6" style="text-align: center; color: var(--text-muted);">Không có dữ liệu đơn phép.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Forgot clock list -->
+                    <div class="glass-panel">
+                        <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Danh Sách Đơn Bổ Sung Công</h4>
+                        <div class="table-responsive">
+                            <table class="premium-table" style="font-size: 14px;">
+                                <thead>
+                                    <tr>
+                                        <th>NGÀY BỔ SUNG</th>
+                                        <th>LOẠI CHECK</th>
+                                        <th>GIỜ ĐỀ NGHỊ</th>
+                                        <th>LÝ DO</th>
+                                        <th>THỜI GIAN GỬI</th>
+                                        <th>TRẠNG THÁI</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="f : ${forgotRequests}">
+                                        <td th:text="${f.date}">01/06/2026</td>
+                                        <td th:text="${f.clockType == 'CLOCK_IN' ? 'Check In' : 'Check Out'}">Check In</td>
+                                        <td th:text="${f.timeProposed}">08:00</td>
+                                        <td th:text="${f.reason}">Quên checkin</td>
+                                        <td th:text="${#temporals.format(f.createdAt, 'dd/MM/yyyy HH:mm:ss')}">10/05/2026 09:15:00</td>
+                                        <td>
+                                            <span th:class="${f.status == 'APPROVED' ? 'status-badge badge-green' : (f.status == 'PENDING' ? 'status-badge badge-orange' : 'status-badge badge-red')}" 
+                                                  th:text="${f.status}">PENDING</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(forgotRequests)}">
+                                        <td colspan="6" style="text-align: center; color: var(--text-muted);">Không có dữ liệu đơn bổ sung công.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -305,6 +359,207 @@
         document.addEventListener('DOMContentLoaded', () => {
             populatePortalMonthSelector();
             loadPortalSchedule();
+        });
+
+        // Modal functions
+        function openLeaveModal() {
+            document.getElementById('leaveModal').classList.add('active');
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('leaveStartDate').value = today;
+            document.getElementById('leaveEndDate').value = today;
+        }
+
+        function closeLeaveModal() {
+            document.getElementById('leaveModal').classList.remove('active');
+            document.getElementById('leaveForm').reset();
+        }
+
+        function submitLeave(event) {
+            event.preventDefault();
+            const startDate = document.getElementById('leaveStartDate').value;
+            const endDate = document.getElementById('leaveEndDate').value;
+            const leaveType = document.getElementById('leaveType').value;
+            const reason = document.getElementById('leaveReason').value;
+
+            if (new Date(startDate) > new Date(endDate)) {
+                showToast("Ngày bắt đầu không được sau ngày kết thúc!", "warning");
+                return;
+            }
+
+            const payload = {
+                startDate: startDate,
+                endDate: endDate,
+                leaveType: leaveType,
+                reason: reason
+            };
+
+            fetch('/api/employee/leave-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Gửi đơn xin nghỉ phép thành công!", "success");
+                    closeLeaveModal();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            })
+            .catch(err => {
+                showToast("Lỗi kết nối máy chủ!", "error");
+                console.error(err);
+            });
+        }
+
+        function openForgotClockModal() {
+            document.getElementById('forgotClockModal').classList.add('active');
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('forgotDate').value = today;
+        }
+
+        function closeForgotClockModal() {
+            document.getElementById('forgotClockModal').classList.remove('active');
+            document.getElementById('forgotClockForm').reset();
+        }
+
+        function submitForgotClock(event) {
+            event.preventDefault();
+            const date = document.getElementById('forgotDate').value;
+            const clockType = document.getElementById('forgotClockType').value;
+            const timeProposed = document.getElementById('forgotTimeProposed').value;
+            const reason = document.getElementById('forgotReason').value;
+
+            const payload = {
+                date: date,
+                clockType: clockType,
+                timeProposed: timeProposed,
+                reason: reason
+            };
+
+            fetch('/api/employee/forgot-clock-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Gửi yêu cầu bổ sung công thành công!", "success");
+                    closeForgotClockModal();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    const text = await res.text();
+                    showToast("Lỗi: " + text, "error");
+                }
+            })
+            .catch(err => {
+                showToast("Lỗi kết nối máy chủ!", "error");
+                console.error(err);
+            });
+        }
+    </script>
+
+    <!-- Leave Request Modal -->
+    <div id="leaveModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 style="font-size: 20px; font-weight: 700; color: white;">📝 Gửi Đơn Xin Nghỉ Phép</h3>
+                <button class="modal-close" onclick="closeLeaveModal()">&times;</button>
+            </div>
+            <form id="leaveForm" onsubmit="submitLeave(event)">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Ngày bắt đầu</label>
+                    <input type="date" id="leaveStartDate" class="form-input" required style="width: 100%; box-sizing: border-box; color: white;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Ngày kết thúc</label>
+                    <input type="date" id="leaveEndDate" class="form-input" required style="width: 100%; box-sizing: border-box; color: white;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Loại nghỉ phép</label>
+                    <select id="leaveType" class="form-input" style="width: 100%; box-sizing: border-box; background: var(--bg-surface); color: white;">
+                        <option value="ANNUAL">Nghỉ phép năm (ANNUAL)</option>
+                        <option value="SICK">Nghỉ ốm (SICK)</option>
+                        <option value="UNPAID">Nghỉ không lương (UNPAID)</option>
+                        <option value="OTHER">Lý do khác (OTHER)</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Lý do nghỉ</label>
+                    <textarea id="leaveReason" class="form-input" rows="4" required style="width: 100%; box-sizing: border-box; font-family: inherit; resize: vertical; color: white;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeLeaveModal()">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Gửi Đơn</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Forgot Clock Modal -->
+    <div id="forgotClockModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 style="font-size: 20px; font-weight: 700; color: white;">⏰ Xin Bổ Sung Chấm Công</h3>
+                <button class="modal-close" onclick="closeForgotClockModal()">&times;</button>
+            </div>
+            <form id="forgotClockForm" onsubmit="submitForgotClock(event)">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Ngày cần bổ sung</label>
+                    <input type="date" id="forgotDate" class="form-input" required style="width: 100%; box-sizing: border-box; color: white;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Loại chấm công</label>
+                    <select id="forgotClockType" class="form-input" style="width: 100%; box-sizing: border-box; background: var(--bg-surface); color: white;">
+                        <option value="CLOCK_IN">Check In (Vào ca)</option>
+                        <option value="CLOCK_OUT">Check Out (Ra ca)</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Giờ đề nghị bổ sung</label>
+                    <input type="time" id="forgotTimeProposed" class="form-input" required style="width: 100%; box-sizing: border-box; color: white;">
+                </div>
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: white;">Lý do bổ sung</label>
+                    <textarea id="forgotReason" class="form-input" rows="4" required style="width: 100%; box-sizing: border-box; font-family: inherit; resize: vertical; color: white;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeForgotClockModal()">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Gửi Yêu Cầu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const switcher = document.getElementById("globalBranchSwitcher");
+            if (switcher) {
+                switcher.addEventListener("change", function() {
+                    const branchId = this.value;
+                    fetch('/api/branch/select?branchId=' + encodeURIComponent(branchId), {
+                        method: 'POST'
+                    }).then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Không thể chuyển chi nhánh");
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        alert("Đã xảy ra lỗi khi chuyển chi nhánh");
+                    });
+                });
+            }
         });
     </script>
 </body>

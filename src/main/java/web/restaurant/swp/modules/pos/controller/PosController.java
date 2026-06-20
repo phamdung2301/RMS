@@ -63,6 +63,8 @@ public class PosController {
     private final PasswordEncoder passwordEncoder;
     private final OrderService orderService;
     private final BankSettingRepository bankSettingRepository;
+    private final AuthService authService;
+    private final AuditLogRepository auditLogRepository;
 
     private User getLoggedInUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -71,21 +73,26 @@ public class PosController {
     }
 
     private String getActiveBranchId() {
+        return web.restaurant.swp.config.BranchContext.getActiveBranchId(getLoggedInUser());
+    }
+
+    private String getActiveTenantId() {
         User user = getLoggedInUser();
-        if (user != null && user.getBranch() != null) {
-            return user.getBranch().getBranchId();
+        if (user != null && user.getTenant() != null) {
+            return user.getTenant().getTenantId();
         }
-        return "branch-1";
+        return "tenant-1";
     }
 
     @GetMapping("/pos")
     public String pos(Model model) {
         String branchId = getActiveBranchId();
+        String tenantId = getActiveTenantId();
         model.addAttribute("tables", tableRepository.findByRoomBranchBranchId(branchId));
-        model.addAttribute("products", productRepository.findByIsActiveTrue());
-        model.addAttribute("categories", categoryRepository.findAll());
-        model.addAttribute("variants", productVariantRepository.findAll());
-        model.addAttribute("customers", customerRepository.findAll());
+        model.addAttribute("products", productRepository.findByTenantTenantIdAndIsActiveTrue(tenantId));
+        model.addAttribute("categories", categoryRepository.findByTenantTenantId(tenantId));
+        model.addAttribute("variants", productVariantRepository.findByProductTenantTenantId(tenantId));
+        model.addAttribute("customers", customerRepository.findByTenantTenantId(tenantId));
         model.addAttribute("rooms", roomRepository.findByBranchBranchId(branchId));
         model.addAttribute("activeBranchId", branchId);
         return "pos";
@@ -137,6 +144,9 @@ public class PosController {
     public ResponseEntity<?> openSession(@RequestParam Long tableId, @RequestParam(required = false) Long customerId) {
         try {
             TableSession session = orderService.openTableSession(tableId, customerId);
+            User user = getLoggedInUser();
+            authService.logAudit(user, "OPEN_SESSION", "Order", session.getId().toString(),
+                "Mở ca (Check-in) cho bàn " + session.getTable().getName(), "127.0.0.1", session.getTable().getRoom().getBranch().getBranchId());
             return ResponseEntity.ok(session);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -148,6 +158,10 @@ public class PosController {
     public ResponseEntity<?> addToCart(@RequestParam Long sessionId, @RequestParam Long variantId, @RequestParam int quantity, @RequestParam(required = false, defaultValue = "") String notes) {
         try {
             OrderDetail detail = orderService.addItemToSession(sessionId, variantId, quantity, notes);
+            User user = getLoggedInUser();
+            authService.logAudit(user, "ORDER_ADD_ITEM", "Order", detail.getOrder().getId().toString(),
+                "Thêm món: " + quantity + "x " + detail.getVariant().getProduct().getName() + " (" + detail.getVariant().getName() + ") vào bàn " + detail.getOrder().getSession().getTable().getName(),
+                "127.0.0.1", detail.getOrder().getBranchId());
             return ResponseEntity.ok(detail);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -159,6 +173,12 @@ public class PosController {
     public ResponseEntity<?> sendToKds(@RequestParam Long sessionId) {
         try {
             orderService.sendToKitchen(sessionId);
+            User user = getLoggedInUser();
+            TableSession session = tableSessionRepository.findById(sessionId).orElse(null);
+            String branchId = (session != null) ? session.getTable().getRoom().getBranch().getBranchId() : getActiveBranchId();
+            authService.logAudit(user, "ORDER_SEND_KITCHEN", "Order", sessionId.toString(),
+                "Gửi yêu cầu chế biến món ăn bàn " + (session != null ? session.getTable().getName() : sessionId) + " xuống bếp",
+                "127.0.0.1", branchId);
             KdsWebSocketHandler.broadcast("NEW_ORDER_SUBMITTED");
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -170,7 +190,14 @@ public class PosController {
     @ResponseBody
     public ResponseEntity<?> mergeBill(@RequestParam Long sourceSessionId, @RequestParam Long targetSessionId) {
         try {
+            TableSession src = tableSessionRepository.findById(sourceSessionId).orElse(null);
+            TableSession tgt = tableSessionRepository.findById(targetSessionId).orElse(null);
             orderService.mergeBill(sourceSessionId, targetSessionId);
+            User user = getLoggedInUser();
+            String branchId = (tgt != null) ? tgt.getTable().getRoom().getBranch().getBranchId() : getActiveBranchId();
+            authService.logAudit(user, "BILL_MERGE", "Order", targetSessionId.toString(),
+                "Ghép hóa đơn từ bàn " + (src != null ? src.getTable().getName() : sourceSessionId) + " sang bàn " + (tgt != null ? tgt.getTable().getName() : targetSessionId),
+                "127.0.0.1", branchId);
             KdsWebSocketHandler.broadcast("ORDER_STATE_CHANGED");
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -185,7 +212,13 @@ public class PosController {
             List<Long> ids = Arrays.stream(detailIds.split(","))
                     .map(Long::parseLong)
                     .collect(Collectors.toList());
+            TableSession original = tableSessionRepository.findById(sessionId).orElse(null);
             List<Long> sessions = orderService.splitBill(sessionId, ids);
+            User user = getLoggedInUser();
+            String branchId = (original != null) ? original.getTable().getRoom().getBranch().getBranchId() : getActiveBranchId();
+            authService.logAudit(user, "BILL_SPLIT", "Order", sessionId.toString(),
+                "Tách hóa đơn của bàn " + (original != null ? original.getTable().getName() : sessionId) + " (Tạo phiên bàn mới #" + sessions.get(1) + ")",
+                "127.0.0.1", branchId);
             KdsWebSocketHandler.broadcast("ORDER_STATE_CHANGED");
             return ResponseEntity.ok(sessions);
         } catch (Exception e) {
@@ -208,9 +241,59 @@ public class PosController {
     @ResponseBody
     public ResponseEntity<?> finalizePayment(@RequestParam Long sessionId, @RequestParam double amount, @RequestParam(required = false, defaultValue = "CASH") String paymentMethod) {
         try {
+            TableSession session = tableSessionRepository.findById(sessionId).orElse(null);
             orderService.confirmPayment(sessionId, amount, paymentMethod);
+            User user = getLoggedInUser();
+            String branchId = (session != null) ? session.getTable().getRoom().getBranch().getBranchId() : getActiveBranchId();
+            authService.logAudit(user, "BILL_PAYMENT", "Order", sessionId.toString(),
+                "Thanh toán thành công hóa đơn bàn " + (session != null ? session.getTable().getName() : sessionId) + ", số tiền: ₫" + String.format("%,.0f", amount) + " (" + paymentMethod + ")",
+                "127.0.0.1", branchId);
             KdsWebSocketHandler.broadcast("ORDER_STATE_CHANGED");
             return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/pos/order-logs")
+    @ResponseBody
+    public ResponseEntity<?> getOrderLogs(@RequestParam(required = false, defaultValue = "day") String range) {
+        try {
+            String branchId = getActiveBranchId();
+            LocalDateTime start;
+            LocalDateTime end = LocalDateTime.now();
+
+            if ("week".equalsIgnoreCase(range)) {
+                start = LocalDate.now().minusDays(7).atStartOfDay();
+            } else if ("month".equalsIgnoreCase(range)) {
+                start = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            } else {
+                start = LocalDate.now().atStartOfDay(); // day
+            }
+
+            List<String> actions = Arrays.asList("OPEN_SESSION", "ORDER_ADD_ITEM", "ORDER_SEND_KITCHEN", "BILL_MERGE", "BILL_SPLIT", "BILL_PAYMENT");
+            
+            // Check if super admin
+            User loggedInUser = getLoggedInUser();
+            boolean isSuperAdmin = loggedInUser != null && loggedInUser.getBranch() == null && loggedInUser.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
+            
+            String queryBranchId = isSuperAdmin ? null : branchId;
+            List<AuditLog> logs = auditLogRepository.findLogsForPOS(start, end, actions, queryBranchId);
+
+            List<Map<String, Object>> result = logs.stream()
+                .map(log -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", log.getId());
+                    map.put("userName", log.getUserName());
+                    map.put("action", log.getAction());
+                    map.put("description", log.getDescription());
+                    map.put("createdAt", log.getCreatedAt().toString());
+                    map.put("ipAddress", log.getIpAddress());
+                    return map;
+                })
+                .collect(Collectors.toList());
+
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -220,11 +303,12 @@ public class PosController {
     @ResponseBody
     public ResponseEntity<?> getBankSetting() {
         try {
-            List<BankSetting> list = bankSettingRepository.findAll();
-            if (list.isEmpty()) {
+            String branchId = getActiveBranchId();
+            Optional<BankSetting> settingOpt = bankSettingRepository.findByBranchBranchId(branchId);
+            if (settingOpt.isEmpty()) {
                 return ResponseEntity.ok(new HashMap<>());
             }
-            return ResponseEntity.ok(list.get(0));
+            return ResponseEntity.ok(settingOpt.get());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -239,12 +323,17 @@ public class PosController {
                 return ResponseEntity.status(403).body("Không có quyền thực hiện thao tác này.");
             }
 
-            List<BankSetting> list = bankSettingRepository.findAll();
+            String branchId = getActiveBranchId();
+            Branch branch = branchRepository.findById(branchId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh"));
+
+            Optional<BankSetting> settingOpt = bankSettingRepository.findByBranchBranchId(branchId);
             BankSetting setting;
-            if (list.isEmpty()) {
+            if (settingOpt.isEmpty()) {
                 setting = new BankSetting();
+                setting.setBranch(branch);
             } else {
-                setting = list.get(0);
+                setting = settingOpt.get();
             }
 
             setting.setBankName(bankName);
@@ -417,13 +506,24 @@ public class PosController {
     public ResponseEntity<?> getBranchAdmins() {
         try {
             User loggedInUser = getLoggedInUser();
-            if (loggedInUser == null || loggedInUser.getBranch() != null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
+            if (loggedInUser == null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
                 return ResponseEntity.status(403).body("Không có quyền truy cập.");
             }
 
+            String tenantId = getActiveTenantId();
+            boolean isPartnerAdmin = loggedInUser.getBranch() != null;
             List<User> users = userRepository.findAll().stream()
+                    .filter(u -> u.getTenant() != null && u.getTenant().getTenantId().equals(tenantId))
                     .filter(u -> !u.getEmail().equalsIgnoreCase(loggedInUser.getEmail()))
-                    .filter(u -> u.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()) || "MANAGER".equalsIgnoreCase(r.getName())))
+                    .filter(u -> {
+                        boolean isAdmin = u.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
+                        boolean isManager = u.getRoles().stream().anyMatch(r -> "MANAGER".equalsIgnoreCase(r.getName()));
+                        if (isPartnerAdmin) {
+                            return isManager;
+                        } else {
+                            return isAdmin || isManager;
+                        }
+                    })
                     .collect(Collectors.toList());
 
             List<Map<String, Object>> result = new ArrayList<>();
@@ -451,11 +551,27 @@ public class PosController {
 
     @PostMapping("/api/pos/branch-admins/add")
     @ResponseBody
-    public ResponseEntity<?> addBranchAdmin(@RequestParam String email, @RequestParam String name, @RequestParam String password, @RequestParam(required = false) String branchId, @RequestParam String roleName) {
+    public ResponseEntity<?> addBranchAdmin(
+            @RequestParam String email, 
+            @RequestParam String name, 
+            @RequestParam String password, 
+            @RequestParam(required = false) String branchId, 
+            @RequestParam String roleName,
+            @RequestParam(required = false) String newBranchId,
+            @RequestParam(required = false) String newBranchName,
+            @RequestParam(required = false) String newBranchAddress,
+            @RequestParam(required = false) String newBranchPhone) {
         try {
             User loggedInUser = getLoggedInUser();
-            if (loggedInUser == null || loggedInUser.getBranch() != null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
+            if (loggedInUser == null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
                 return ResponseEntity.status(403).body("Không có quyền thực hiện.");
+            }
+
+            boolean isPartnerAdmin = loggedInUser.getBranch() != null;
+            if (isPartnerAdmin) {
+                if (branchId == null || branchId.trim().isEmpty()) {
+                    return ResponseEntity.badRequest().body("Vui lòng chọn chi nhánh quản lý.");
+                }
             }
 
             if (userRepository.findByEmail(email).isPresent()) {
@@ -463,12 +579,33 @@ public class PosController {
             }
 
             Branch branch = null;
-            if (branchId != null && !branchId.trim().isEmpty()) {
+            if ("_NEW_".equals(branchId)) {
+                if (newBranchId == null || newBranchId.trim().isEmpty() || 
+                    newBranchName == null || newBranchName.trim().isEmpty() ||
+                    newBranchAddress == null || newBranchAddress.trim().isEmpty()) {
+                    return ResponseEntity.badRequest().body("Vui lòng nhập đầy đủ mã, tên và địa chỉ chi nhánh mới.");
+                }
+                Optional<Branch> existingBranch = branchRepository.findById(newBranchId.trim());
+                if (existingBranch.isPresent()) {
+                    branch = existingBranch.get();
+                } else {
+                    branch = Branch.builder()
+                            .branchId(newBranchId.trim())
+                            .name(newBranchName.trim())
+                            .address(newBranchAddress != null ? newBranchAddress.trim() : "")
+                            .phone(newBranchPhone != null ? newBranchPhone.trim() : "")
+                            .tenant(loggedInUser.getTenant())
+                            .isActive(true)
+                            .build();
+                    branch = branchRepository.save(branch);
+                }
+            } else if (branchId != null && !branchId.trim().isEmpty()) {
                 branch = branchRepository.findById(branchId).orElse(null);
             }
 
-            Role role = roleRepository.findByName(roleName.toUpperCase())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò " + roleName));
+            String resolvedRoleName = isPartnerAdmin ? "MANAGER" : "ADMIN";
+            Role role = roleRepository.findByName(resolvedRoleName)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò " + resolvedRoleName));
 
             User user = User.builder()
                     .email(email)
@@ -477,6 +614,7 @@ public class PosController {
                     .branch(branch)
                     .roles(new HashSet<>(Arrays.asList(role)))
                     .isActive(true)
+                    .tenant(loggedInUser.getTenant())
                     .build();
 
             user = userRepository.save(user);
@@ -488,15 +626,41 @@ public class PosController {
 
     @PostMapping("/api/pos/branch-admins/update")
     @ResponseBody
-    public ResponseEntity<?> updateBranchAdmin(@RequestParam Long id, @RequestParam String email, @RequestParam String name, @RequestParam(required = false) String password, @RequestParam(required = false) String branchId, @RequestParam String roleName, @RequestParam boolean isActive) {
+    public ResponseEntity<?> updateBranchAdmin(
+            @RequestParam Long id, 
+            @RequestParam String email, 
+            @RequestParam String name, 
+            @RequestParam(required = false) String password, 
+            @RequestParam(required = false) String branchId, 
+            @RequestParam String roleName, 
+            @RequestParam boolean isActive,
+            @RequestParam(required = false) String newBranchId,
+            @RequestParam(required = false) String newBranchName,
+            @RequestParam(required = false) String newBranchAddress,
+            @RequestParam(required = false) String newBranchPhone) {
         try {
             User loggedInUser = getLoggedInUser();
-            if (loggedInUser == null || loggedInUser.getBranch() != null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
+            if (loggedInUser == null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
                 return ResponseEntity.status(403).body("Không có quyền thực hiện.");
             }
 
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản."));
+
+            boolean isPartnerAdmin = loggedInUser.getBranch() != null;
+            if (isPartnerAdmin) {
+                boolean targetIsManager = user.getRoles().stream().anyMatch(r -> "MANAGER".equalsIgnoreCase(r.getName()));
+                if (!targetIsManager) {
+                    return ResponseEntity.status(403).body("Không có quyền chỉnh sửa tài khoản quản trị khác.");
+                }
+                if (branchId == null || branchId.trim().isEmpty()) {
+                    return ResponseEntity.badRequest().body("Vui lòng chọn chi nhánh quản lý.");
+                }
+            }
+
+            if (user.getTenant() == null || !user.getTenant().getTenantId().equals(loggedInUser.getTenant().getTenantId())) {
+                return ResponseEntity.status(403).body("Không có quyền thực hiện thao tác trên tài khoản thuộc tenant khác.");
+            }
 
             if (!user.getEmail().equalsIgnoreCase(email)) {
                 if (userRepository.findByEmail(email).isPresent()) {
@@ -513,12 +677,33 @@ public class PosController {
             }
 
             Branch branch = null;
-            if (branchId != null && !branchId.trim().isEmpty()) {
+            if ("_NEW_".equals(branchId)) {
+                if (newBranchId == null || newBranchId.trim().isEmpty() || 
+                    newBranchName == null || newBranchName.trim().isEmpty() ||
+                    newBranchAddress == null || newBranchAddress.trim().isEmpty()) {
+                    return ResponseEntity.badRequest().body("Vui lòng nhập đầy đủ mã, tên và địa chỉ chi nhánh mới.");
+                }
+                Optional<Branch> existingBranch = branchRepository.findById(newBranchId.trim());
+                if (existingBranch.isPresent()) {
+                    branch = existingBranch.get();
+                } else {
+                    branch = Branch.builder()
+                            .branchId(newBranchId.trim())
+                            .name(newBranchName.trim())
+                            .address(newBranchAddress != null ? newBranchAddress.trim() : "")
+                            .phone(newBranchPhone != null ? newBranchPhone.trim() : "")
+                            .tenant(loggedInUser.getTenant())
+                            .isActive(true)
+                            .build();
+                    branch = branchRepository.save(branch);
+                }
+            } else if (branchId != null && !branchId.trim().isEmpty()) {
                 branch = branchRepository.findById(branchId).orElse(null);
             }
             user.setBranch(branch);
 
-            Role role = roleRepository.findByName(roleName.toUpperCase())
+            String resolvedRoleName = isPartnerAdmin ? "MANAGER" : "ADMIN";
+            Role role = roleRepository.findByName(resolvedRoleName)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò."));
             user.setRoles(new HashSet<>(Arrays.asList(role)));
 
@@ -535,12 +720,24 @@ public class PosController {
     public ResponseEntity<?> deleteBranchAdmin(@RequestParam Long id) {
         try {
             User loggedInUser = getLoggedInUser();
-            if (loggedInUser == null || loggedInUser.getBranch() != null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
+            if (loggedInUser == null || loggedInUser.getRoles().stream().noneMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()))) {
                 return ResponseEntity.status(403).body("Không có quyền thực hiện.");
             }
 
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản."));
+
+            boolean isPartnerAdmin = loggedInUser.getBranch() != null;
+            if (isPartnerAdmin) {
+                boolean targetIsManager = user.getRoles().stream().anyMatch(r -> "MANAGER".equalsIgnoreCase(r.getName()));
+                if (!targetIsManager) {
+                    return ResponseEntity.status(403).body("Không có quyền xóa tài khoản quản trị khác.");
+                }
+            }
+
+            if (user.getTenant() == null || !user.getTenant().getTenantId().equals(loggedInUser.getTenant().getTenantId())) {
+                return ResponseEntity.status(403).body("Không có quyền thực hiện thao tác trên tài khoản thuộc tenant khác.");
+            }
 
             Optional<Employee> empOpt = employeeRepository.findByUserId(id);
             if (empOpt.isPresent()) {

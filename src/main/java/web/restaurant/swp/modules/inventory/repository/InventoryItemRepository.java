@@ -36,4 +36,6 @@ import java.util.Optional;
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, Long> {
     Optional<InventoryItem> findBySku(String sku);
+    Optional<InventoryItem> findBySkuAndTenantTenantId(String sku, String tenantId);
+    List<InventoryItem> findByTenantTenantId(String tenantId);
 }
