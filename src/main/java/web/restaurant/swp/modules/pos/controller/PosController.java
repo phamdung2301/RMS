@@ -306,6 +306,9 @@ public class PosController {
             String branchId = getActiveBranchId();
             Optional<BankSetting> settingOpt = bankSettingRepository.findByBranchBranchId(branchId);
             if (settingOpt.isEmpty()) {
+                settingOpt = bankSettingRepository.findByBranchBranchId("01-2thang9");
+            }
+            if (settingOpt.isEmpty()) {
                 return ResponseEntity.ok(new HashMap<>());
             }
             return ResponseEntity.ok(settingOpt.get());
