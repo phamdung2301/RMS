@@ -5,6 +5,7 @@ COPY pom.xml .
 # Download dependencies trước để tăng tốc build lần sau
 RUN mvn dependency:go-offline -B
 COPY src ./src
+COPY sql ./sql
 # Build file jar bỏ qua các bài test để tiết kiệm RAM & thời gian
 RUN mvn clean package -DskipTests
 
@@ -12,5 +13,7 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/swp-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/sql ./sql
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
