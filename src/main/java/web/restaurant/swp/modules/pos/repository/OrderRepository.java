@@ -38,4 +38,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByBranchIdAndStatusNot(String branchId, String status);
     List<Order> findByBranchId(String branchId);
     List<Order> findBySessionId(Long sessionId);
+
+    @Query("SELECT o.branchId, SUM(o.totalAmount) FROM Order o WHERE o.status = 'SERVED' GROUP BY o.branchId")
+    List<Object[]> findRevenueByBranch();
 }

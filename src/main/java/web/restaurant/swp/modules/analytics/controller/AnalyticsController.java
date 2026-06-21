@@ -43,6 +43,7 @@ import java.util.*;
 public class AnalyticsController {
 
     private final OrderRepository orderRepository;
+    private final OrderDetailRepository orderDetailRepository;
     private final TableRepository tableRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
@@ -56,6 +57,26 @@ public class AnalyticsController {
 
     private String getActiveBranchId() {
         return web.restaurant.swp.config.BranchContext.getActiveBranchId(getLoggedInUser());
+    }
+
+    private String formatShortAmount(double amount) {
+        if (amount >= 1_000_000) {
+            double val = amount / 1_000_000.0;
+            if (val == (long) val) {
+                return String.format(Locale.US, "%dM", (long) val);
+            } else {
+                return String.format(Locale.US, "%.1fM", val);
+            }
+        } else if (amount >= 1_000) {
+            double val = amount / 1_000.0;
+            if (val == (long) val) {
+                return String.format(Locale.US, "%dk", (long) val);
+            } else {
+                return String.format(Locale.US, "%.1fk", val);
+            }
+        } else {
+            return String.format(Locale.US, "%d", (long) amount);
+        }
     }
 
     @GetMapping("/dashboard")
@@ -83,16 +104,75 @@ public class AnalyticsController {
         User loggedInUser = getLoggedInUser();
         boolean isSuperAdmin = loggedInUser != null && loggedInUser.getBranch() == null && loggedInUser.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
         model.addAttribute("isSuperAdmin", isSuperAdmin);
-        model.addAttribute("branches", branchRepository.findAll());
+        
+        List<Branch> allBranches = branchRepository.findAll();
+        model.addAttribute("branches", allBranches);
 
-        // Seed data for best selling chart
-        List<Map<String, Object>> bestSellers = Arrays.asList(
-            Map.of("name", "Gỏi Cuốn Tôm", "value", "1.6M"),
-            Map.of("name", "Phở Bò", "value", "1.7M"),
-            Map.of("name", "Cơm Tấm Sườn", "value", "1.9M"),
-            Map.of("name", "Bánh Mì Thịt", "value", "0.8M"),
-            Map.of("name", "Bún Chả Hà Nội", "value", "1.2M")
-        );
+        // Fetch actual branch revenues
+        Map<String, Double> branchRevenueMap = new HashMap<>();
+        List<Object[]> revenueData = orderRepository.findRevenueByBranch();
+        for (Object[] row : revenueData) {
+            if (row[0] != null && row[1] != null) {
+                branchRevenueMap.put((String) row[0], ((Number) row[1]).doubleValue());
+            }
+        }
+
+        double maxRevenue = 0.0;
+        for (Branch b : allBranches) {
+            double rev = branchRevenueMap.getOrDefault(b.getBranchId(), 0.0);
+            if (rev > maxRevenue) maxRevenue = rev;
+        }
+
+        List<Map<String, Object>> branchRevenues = new ArrayList<>();
+        for (Branch b : allBranches) {
+            double rev = branchRevenueMap.getOrDefault(b.getBranchId(), 0.0);
+            
+            int percentage = 10;
+            if (maxRevenue > 0) {
+                percentage = (int) ((rev / maxRevenue) * 80) + 10;
+            }
+            
+            String formattedRevenue = formatShortAmount(rev);
+            
+            Map<String, Object> item = new HashMap<>();
+            item.put("branchId", b.getBranchId());
+            item.put("branchName", b.getName());
+            item.put("formattedRevenue", formattedRevenue);
+            item.put("percentage", percentage);
+            item.put("isCurrent", b.getBranchId().equals(branchId));
+            
+            branchRevenues.add(item);
+        }
+        
+        branchRevenues.sort((m1, m2) -> {
+            Double r1 = branchRevenueMap.getOrDefault(m1.get("branchId"), 0.0);
+            Double r2 = branchRevenueMap.getOrDefault(m2.get("branchId"), 0.0);
+            return r2.compareTo(r1);
+        });
+        model.addAttribute("branchRevenues", branchRevenues);
+
+        // Fetch actual best sellers
+        List<Map<String, Object>> bestSellers = new ArrayList<>();
+        List<Object[]> bestSellersData = (branchId != null) 
+                ? orderDetailRepository.findBestSellersByBranch(branchId)
+                : orderDetailRepository.findBestSellersAll();
+                
+        int count = 0;
+        for (Object[] row : bestSellersData) {
+            if (count >= 5) break;
+            if (row[0] != null && row[1] != null) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("name", row[0]);
+                item.put("value", row[1] + " phần");
+                bestSellers.add(item);
+                count++;
+            }
+        }
+        if (bestSellers.isEmpty()) {
+            bestSellers = Arrays.asList(
+                Map.of("name", "Chưa có món ăn được phục vụ", "value", "-")
+            );
+        }
         model.addAttribute("bestSellers", bestSellers);
 
         return "dashboard";

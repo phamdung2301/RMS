@@ -37,6 +37,20 @@ import java.util.Optional;
 public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long> {
     List<OrderDetail> findByOrderId(Long orderId);
     List<OrderDetail> findByOrderSessionId(Long sessionId);
+
+    @Query("SELECT od.variant.product.name, SUM(od.quantity) " +
+           "FROM OrderDetail od " +
+           "WHERE od.order.status = 'SERVED' AND od.order.branchId = :branchId " +
+           "GROUP BY od.variant.product.name " +
+           "ORDER BY SUM(od.quantity) DESC")
+    List<Object[]> findBestSellersByBranch(@org.springframework.data.repository.query.Param("branchId") String branchId);
+
+    @Query("SELECT od.variant.product.name, SUM(od.quantity) " +
+           "FROM OrderDetail od " +
+           "WHERE od.order.status = 'SERVED' " +
+           "GROUP BY od.variant.product.name " +
+           "ORDER BY SUM(od.quantity) DESC")
+    List<Object[]> findBestSellersAll();
 }
 
 // --- INVENTORY ---
