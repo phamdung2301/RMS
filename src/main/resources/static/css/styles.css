@@ -598,6 +598,20 @@ body {
     .top-bar .user-profile {
         width: 100%;
         justify-content: space-between;
+        align-items: center;
+    }
+    
+    .user-profile a span {
+        display: none !important;
+    }
+    
+    .user-profile select,
+    .user-profile > span {
+        max-width: calc(100% - 60px);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+        display: inline-block !important;
     }
     
     .dashboard-grid {
