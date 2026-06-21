@@ -19,6 +19,35 @@ body {
     position: relative;
 }
 
+.mobile-brand-header {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 30px;
+}
+
+.mobile-brand-header .brand-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #6366f1, #10b981);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 20px;
+    color: white;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.mobile-brand-header .brand-name {
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(to right, #ffffff, #a5b4fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
 @media (max-width: 992px) {
     .login-container {
         grid-template-columns: 1fr;
@@ -26,7 +55,17 @@ body {
     .left-panel {
         display: none;
     }
+    .mobile-brand-header {
+        display: flex;
+    }
+    .right-panel {
+        padding: 60px 40px !important;
+        background: radial-gradient(circle at 50% 15%, rgba(99, 102, 241, 0.16) 0%, transparent 60%),
+                    radial-gradient(circle at 15% 85%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
+                    linear-gradient(145deg, #050811 0%, #030408 100%) !important;
+    }
 }
+
 
 /* Left Panel / Carousel Section */
 .left-panel {
@@ -646,3 +685,23 @@ body {
     from { transform: scale(0.95) translateY(10px); }
     to { transform: scale(1) translateY(0); }
 }
+
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 30px 20px;
+        border-radius: 20px;
+    }
+    .close-btn {
+        right: 16px;
+        top: 12px;
+        font-size: 24px;
+    }
+    .modal-title {
+        font-size: 20px;
+    }
+    .modal-subtitle {
+        font-size: 12.5px;
+        margin-bottom: 16px;
+    }
+}
+
