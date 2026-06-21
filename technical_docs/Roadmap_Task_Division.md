@@ -10,8 +10,8 @@
 | **Môn học** | SWP391 - Học kỳ 5, Đại học FPT |
 | **Tài liệu** | Kế hoạch Phân công Nhiệm vụ & Lộ trình Phát triển (Project Roadmap & Task Allocation) |
 | **Phiên bản** | 1.0.0 (Bản lập kế hoạch dự án) |
-| **Tác giả** | Tech Lead / Project Manager (20 năm kinh nghiệm) |
-| **Trạng thái** | Sẵn sàng trình duyệt |
+| **Tác giả** | Nhóm phát triển dự án SWP391 |
+| **Trạng thái** | Sẵn sàng báo cáo |
 
 ---
 

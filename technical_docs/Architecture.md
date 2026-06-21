@@ -9,9 +9,9 @@
 | **Dự án** | Hệ Thống Quản Lý Nhà Hàng Chuỗi (RMS - Restaurant Management System) |
 | **Môn học** | SWP391 - Học kỳ 5, Đại học FPT |
 | **Tài liệu** | Tài Liệu Thiết Kế Kiến Trúc Hệ Thống Chi Tiết (System Architecture Document) |
-| **Phiên bản** | 1.1.0 (Bản nâng cấp Epic) |
-| **Tác giả** | Software Architect & Tech Lead (20 năm kinh nghiệm) |
-| **Trạng thái** | Sẵn sàng trình duyệt |
+| **Phiên bản** | 1.1.0 |
+| **Tác giả** | Nhóm phát triển dự án SWP391 |
+| **Trạng thái** | Sẵn sàng báo cáo |
 
 ---
 

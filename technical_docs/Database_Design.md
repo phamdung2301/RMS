@@ -10,8 +10,8 @@
 | **Môn học** | SWP391 - Học kỳ 5, Đại học FPT |
 | **Tài liệu** | Thiết Kế Cơ Sở Dữ Liệu & Từ Điển Dữ Liệu Toàn Diện (Database Design & Dictionary) |
 | **Phiên bản** | 2.0.0 (Bản Toàn Diện Đầy Đủ 43 Bảng) |
-| **Tác giả** | Database Administrator & Tech Lead (20 năm kinh nghiệm) |
-| **Trạng thái** | Hoàn tất & Sẵn sàng trình giảng viên |
+| **Tác giả** | Nhóm phát triển dự án SWP391 |
+| **Trạng thái** | Hoàn tất & Sẵn sàng báo cáo |
 
 ---
 
@@ -19,7 +19,7 @@
 
 Hệ thống sử dụng cơ sở dữ liệu quan hệ **PostgreSQL 16+** làm nền tảng lưu trữ chính thức. Thiết kế cơ sở dữ liệu tuân thủ nghiêm ngặt chuẩn chuẩn hóa **3NF (Third Normal Form)** nhằm triệt tiêu dư thừa dữ liệu và đảm bảo tính toàn vẹn dữ liệu ở mức tối đa.
 
-Tài liệu này đặc tả chi tiết cấu trúc vật lý của **toàn bộ 43 bảng dữ liệu** đang hoạt động trong hệ thống. Hệ thống đã được thiết kế lại toàn diện xoay quanh **3 Epic nâng cấp cốt lõi**:
+Tài liệu này đặc tả chi tiết cấu trúc vật lý của **toàn bộ 43 bảng dữ liệu** đang hoạt động trong hệ thống. Thiết kế cơ sở dữ liệu được xây dựng hoàn thiện xoay quanh các phân hệ cốt lõi sau:
 1.  **Hội viên lấy Số điện thoại (SĐT) làm định danh Khóa chính**: Loại bỏ surrogate ID `id` của bảng `customers`. Khóa chính chính thức là `phone VARCHAR(15)`. Các bảng tham chiếu ngoại như `table_sessions`, `promotion_usage`, `loyalty_transactions` đều đổi cột khóa ngoại thành `customer_phone VARCHAR(15)` tham chiếu trực tiếp đến `customers(phone)`.
 2.  **Động cơ Tích lũy & Thăng hạng tự động**: Hệ thống lưu trữ `total_spent` và `loyalty_points` để tự động nâng cấp hạng thẻ (Bronze, Silver, Gold, Platinum).
 3.  **Vận hành Chuỗi Đa chi nhánh (Multi-Branch)**: Các thực thể kho hàng, bàn ăn, nhân sự, hóa đơn đều được phân tách logic bằng khóa ngoại `branch_id`. Bổ sung các bảng nâng cao như `branch_product_prices` (giá chi nhánh), `internal_purchase_orders` (đơn hàng nội bộ Kho tổng), `cash_drawer_sessions` (ca két tiền mặt thu ngân), `user_branches` (gán quản lý khu vực) và `promotion_branches` (khuyến mãi theo chi nhánh).

@@ -307,12 +307,57 @@ def compile_markdown_to_docx(md_path, docx_path):
             p.paragraph_format.space_after = Pt(4)
             parse_and_add_runs(p, stripped[2:])
             
+        elif stripped.startswith("![") and stripped.endswith(")"):
+            # Image pattern: ![caption](path)
+            img_match = re.match(r'^!\[(.*?)\]\((.*?)\)', stripped)
+            if img_match:
+                caption = img_match.group(1)
+                img_path_raw = img_match.group(2)
+                # Normalize path
+                if img_path_raw.startswith("file:///"):
+                    img_path = img_path_raw.replace("file:///", "")
+                else:
+                    # Resolve relative to md file folder
+                    img_path = os.path.join(os.path.dirname(md_path), img_path_raw)
+                
+                # Check absolute or relative path
+                if not os.path.isabs(img_path):
+                    img_path = os.path.abspath(img_path)
+                
+                # Replace Windows forward/back slashes
+                img_path = img_path.replace("/", os.sep).replace("\\", os.sep)
+                
+                if os.path.exists(img_path):
+                    try:
+                        p_img = doc.add_paragraph()
+                        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        p_img.paragraph_format.space_before = Pt(8)
+                        p_img.paragraph_format.space_after = Pt(4)
+                        run_img = p_img.add_run()
+                        run_img.add_picture(img_path, width=Inches(5.5))
+                        
+                        # Add caption
+                        p_cap = doc.add_paragraph()
+                        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        p_cap.paragraph_format.space_before = Pt(0)
+                        p_cap.paragraph_format.space_after = Pt(8)
+                        run_cap = p_cap.add_run(f"Hình: {caption}")
+                        run_cap.font.name = 'Calibri'
+                        run_cap.font.size = Pt(9.5)
+                        run_cap.italic = True
+                        run_cap.font.color.rgb = RGBColor(107, 114, 128)
+                    except Exception as img_err:
+                        print(f"Error inserting image {img_path}: {img_err}")
+                else:
+                    print(f"Image file not found: {img_path}")
+            
         elif len(stripped) > 0:
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.15
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(6)
             parse_and_add_runs(p, stripped)
+
             
         else:
             # Empty line, keep small spacing
@@ -333,6 +378,7 @@ def compile_markdown_to_docx(md_path, docx_path):
 def compile_all():
     doc_dir = "d:/swp/technical_docs"
     sys_docs = [
+        "RDS.md",
         "SRS.md",
         "Database_Design.md",
         "Architecture.md",

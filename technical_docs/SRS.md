@@ -9,17 +9,17 @@
 | **Dự án** | Hệ Thống Quản Lý Nhà Hàng Chuỗi (RMS - Restaurant Management System) |
 | **Môn học** | SWP391 - Học kỳ 5, Đại học FPT |
 | **Tài liệu** | Đặc tả Yêu cầu Người dùng & Các Use Case Chi Tiết (SRS & Use Cases) |
-| **Phiên bản** | 1.1.0 (Bản nâng cấp Epic) |
-| **Tác giả** | Technical Lead (20 năm kinh nghiệm) |
-| **Trạng thái** | Sẵn sàng trình duyệt |
+| **Phiên bản** | 1.1.0 |
+| **Tác giả** | Nhóm phát triển dự án SWP391 |
+| **Trạng thái** | Sẵn sàng báo cáo |
 
 ---
 
 # 1. Giới Thiệu Chung (Introduction)
 
-Tài liệu này đặc tả toàn bộ các tính năng nghiệp vụ của hệ thống **Quản lý Nhà hàng Chuỗi (RMS)**. Hệ thống được xây dựng nhằm giải quyết bài toán vận hành thực tế cho chuỗi cửa hàng ẩm thực đa cơ sở. 
+Tài liệu này đặc tả toàn bộ các tính năng nghiệp vụ của hệ thống **Quản lý Nhà hàng Chuỗi (RMS)**. Hệ thống được nhóm chúng em xây dựng nhằm giải quyết bài toán vận hành thực tế cho chuỗi cửa hàng ẩm thực đa cơ sở. 
 
-Tài liệu này đặc biệt tập trung tích hợp **3 Epic nâng cấp cốt lõi** phục vụ báo cáo hội đồng chấm môn học:
+Tài liệu này tập trung làm rõ các phân hệ nghiệp vụ và tính năng cốt lõi phục vụ báo cáo hội đồng chấm môn học:
 1. **Quản lý khách hàng thành viên lấy Số điện thoại (SĐT) làm ID duy nhất**: Tối ưu hóa việc tra cứu và quản lý hồ sơ, loại bỏ surrogate ID.
 2. **Tích lũy tổng tiền hóa đơn & Tự động áp dụng ưu đãi**: Tự động tính toán tổng chi tiêu của khách hàng (`total_spent`) để phân hạng thẻ (Bronze, Silver, Gold, Platinum) và áp dụng các chính sách chiết khấu tương ứng trực tiếp tại quầy POS.
 3. **Phân hệ quản trị đa chi nhánh (Multi-branch)**: Cô lập dữ liệu tồn kho, thực đơn, doanh thu theo từng chi nhánh, đồng thời hỗ trợ luồng chuyển kho nội bộ và đặt hàng từ chi nhánh con lên Kho tổng.

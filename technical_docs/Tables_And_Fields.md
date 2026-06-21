@@ -10,7 +10,7 @@
 | **Môn học** | SWP391 - Học kỳ 5, Đại học FPT |
 | **Tài liệu** | Đặc Tả Chi Tiết Toàn Bộ Bảng & Trường Dữ Liệu (Comprehensive Tables & Fields Specification) |
 | **Phiên bản** | 1.0.0 (Bản Toàn Diện) |
-| **Tác giả** | Tech Lead (20 năm kinh nghiệm) |
+| **Tác giả** | Nhóm phát triển dự án SWP391 |
 | **Trạng thái** | Hoàn tất |
 
 ---

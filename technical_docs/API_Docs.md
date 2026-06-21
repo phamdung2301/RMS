@@ -9,9 +9,9 @@
 | **Dự án** | Hệ Thống Quản Lý Nhà Hàng Chuỗi (RMS - Restaurant Management System) |
 | **Môn học** | SWP391 - Học kỳ 5, Đại học FPT |
 | **Tài liệu** | Tài Liệu Mô Tả Các Cổng Giao Tiếp API Chi Tiết (API Endpoints Documentation) |
-| **Phiên bản** | 1.1.0 (Bản nâng cấp Epic) |
-| **Tác giả** | Software Engineer & Tech Lead (20 năm kinh nghiệm) |
-| **Trạng thái** | Sẵn sàng trình duyệt |
+| **Phiên bản** | 1.1.0 |
+| **Tác giả** | Nhóm phát triển dự án SWP391 |
+| **Trạng thái** | Sẵn sàng báo cáo |
 
 ---
 
@@ -19,7 +19,7 @@
 
 Hệ thống cung cấp hệ thống endpoint phong phú phục vụ cả giao diện Web (Controller trả về Thymeleaf Template) và các API dịch vụ RESTful (RestController trả về cấu trúc dữ liệu JSON). Toàn bộ các API đều được bảo mật bởi **Spring Security** với phân quyền dựa trên vai trò (Role-Based Access Control - RBAC). 
 
-Các API được phân tách chặt chẽ theo các phân hệ nghiệp vụ (Epics) để nhóm phát triển dễ dàng chia Sprint thực hiện độc lập.
+Các API được phân tách chặt chẽ theo các phân hệ nghiệp vụ (Epics) để nhóm chúng em dễ dàng phân chia công việc phát triển độc lập.
 
 ---
 
