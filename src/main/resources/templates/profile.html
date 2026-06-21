@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteFlow - Hồ Sơ Cá Nhân</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <script th:src="@{/js/toast.js}"></script>
+    <style>
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .profile-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .profile-header-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .profile-avatar-large {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-success));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .info-value {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div th:replace="~{fragments/navbar :: sidebar('profile')}"></div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <h2 class="page-title">Hồ Sơ Cá Nhân</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">Xem thông tin nhân viên và cài đặt mật khẩu của bạn</p>
+                </div>
+            </div>
+
+            <!-- Profile & Security Dashboard Grid -->
+            <div class="profile-grid">
+                <!-- Cột trái: Thông tin cá nhân -->
+                <div class="glass-panel">
+                    <div class="profile-header-card">
+                        <div class="profile-avatar-large" th:text="${currentUser != null ? #strings.substring(currentUser.name, 0, 2).toUpperCase() : 'US'}">US</div>
+                        <div>
+                            <h3 style="font-size: 22px; font-weight: 700;" th:text="${currentUser != null ? currentUser.name : 'Người dùng'}">Họ và Tên</h3>
+                            <p style="color: var(--text-muted); font-size: 14px;" th:text="${currentUser != null ? currentUser.email : ''}">email@domain.com</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <div class="info-row">
+                            <span class="info-label">Chi nhánh làm việc</span>
+                            <span class="info-value" th:text="${currentEmployee != null && currentEmployee.branch != null ? currentEmployee.branch.name : (currentUser.branch != null ? currentUser.branch.name : 'Trụ sở chính / Toàn hệ thống')}">Chi nhánh</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Chức danh / Chức vụ</span>
+                            <span class="info-value" th:text="${currentEmployee != null ? currentEmployee.title : 'Chưa cập nhật'}">Chức vụ</span>
+                        </div>
+                        <div class="info-row" th:if="${currentEmployee != null}">
+                            <span class="info-label">Bộ phận</span>
+                            <span class="info-value" th:text="${currentEmployee.department}">Bộ phận</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Ngày bắt đầu làm việc</span>
+                            <span class="info-value" th:text="${currentEmployee != null && currentEmployee.hireDate != null ? #temporals.format(currentEmployee.hireDate, 'dd/MM/yyyy') : 'Chưa cập nhật'}">Ngày bắt đầu</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Lương cơ bản</span>
+                            <span class="info-value" th:text="${currentEmployee != null ? '₫' + #numbers.formatDecimal(currentEmployee.baseSalary, 0, 'COMMA', 0, 'POINT') + ' (' + currentEmployee.salaryType + ')' : 'Không áp dụng'}">Lương</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Vai trò trên hệ thống</span>
+                            <span class="info-value">
+                                <span th:each="role, iter : ${currentUser.roles}" 
+                                      th:text="${role.name} + ${!iter.last ? ', ' : ''}">ADMIN</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cột phải: Đổi mật khẩu -->
+                <div class="glass-panel">
+                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 24px; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                        🔑 Đổi Mật Khẩu
+                    </h3>
+                    
+                    <div class="form-group">
+                        <label style="font-size: 14px; font-weight: 500; margin-bottom: 4px; color: var(--text-muted);">Mật khẩu hiện tại</label>
+                        <input type="password" id="oldPassword" class="form-input" placeholder="Nhập mật khẩu hiện tại" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="font-size: 14px; font-weight: 500; margin-bottom: 4px; color: var(--text-muted);">Mật khẩu mới</label>
+                        <input type="password" id="newPassword" class="form-input" placeholder="Tối thiểu 8 ký tự, 1 số, 1 ký tự đặc biệt" required>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 28px;">
+                        <label style="font-size: 14px; font-weight: 500; margin-bottom: 4px; color: var(--text-muted);">Xác nhận mật khẩu mới</label>
+                        <input type="password" id="confirmPassword" class="form-input" placeholder="Nhập lại mật khẩu mới" required>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="handleChangePassword()" style="width: 100%; justify-content: center; padding: 12px; font-size: 16px; border-radius: 8px;">
+                        Cập Nhật Mật Khẩu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleChangePassword() {
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!oldPassword || !newPassword || !confirmPassword) {
+                showToast("Vui lòng điền đầy đủ tất cả các trường.", "error");
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showToast("Mật khẩu xác nhận không khớp.", "error");
+                return;
+            }
+
+            if (newPassword.length < 8 || !newPassword.match(/\d/) || !newPassword.match(/[!@#$%^&*()]/)) {
+                showToast("Mật khẩu mới không đủ mạnh (tối thiểu 8 ký tự, 1 chữ số, 1 ký tự đặc biệt).", "error");
+                return;
+            }
+
+            showToast("Đang thực hiện đổi mật khẩu...", "info");
+
+            fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    oldPassword: oldPassword,
+                    newPassword: newPassword
+                })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (response.ok) {
+                    showToast("Đổi mật khẩu thành công!", "success");
+                    // Clear inputs
+                    document.getElementById('oldPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                } else {
+                    showToast(data.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu cũ.", "error");
+                }
+            })
+            .catch(error => {
+                showToast("Có lỗi xảy ra trong quá trình xử lý.", "error");
+                console.error(error);
+            });
+        }
+    </script>
+</body>
+</html>

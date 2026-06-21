@@ -331,4 +331,18 @@ public class AuthService {
                 .build();
         auditLogRepository.save(log);
     }
+    @Transactional
+    public void changePassword(String email, String oldPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found."));
+        if (!checkPassword(oldPassword, user.getPassword())) {
+            throw new RuntimeException("Old password is incorrect.");
+        }
+        if (newPassword.length() < 8 || !newPassword.matches(".*\\d.*") || !newPassword.matches(".*[!@#$%^&*()].*")) {
+            throw new RuntimeException("New password not strong enough. Minimum 8 chars, 1 digit, 1 special char.");
+        }
+        user.setPassword(hashPassword(newPassword));
+        userRepository.save(user);
+        logAudit(user, "PASSWORD_CHANGE_SUCCESS", "User", user.getId().toString(), "Password changed by user", "127.0.0.1");
+    }
 }

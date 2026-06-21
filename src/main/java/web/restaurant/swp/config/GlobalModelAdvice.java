@@ -16,6 +16,7 @@ public class GlobalModelAdvice {
 
     private final UserRepository userRepository;
     private final BranchRepository branchRepository;
+    private final web.restaurant.swp.modules.hr.repository.EmployeeRepository employeeRepository;
 
     @ModelAttribute
     public void addGlobalAttributes(Model model) {
@@ -32,6 +33,11 @@ public class GlobalModelAdvice {
                 boolean canSwitchBranch = BranchContext.canSwitchBranch(loggedInUser);
                 model.addAttribute("canSwitchBranch", canSwitchBranch);
                 model.addAttribute("currentUser", loggedInUser);
+
+                // Add currentEmployee if exists
+                employeeRepository.findByUserId(loggedInUser.getId()).ifPresent(employee -> {
+                    model.addAttribute("currentEmployee", employee);
+                });
 
                 String activeBranchId = BranchContext.getActiveBranchId(loggedInUser);
                 model.addAttribute("activeBranchId", activeBranchId);
