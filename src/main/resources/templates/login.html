@@ -164,6 +164,11 @@
                     <span class="dot" onclick="goToSlide(2)"></span>
                     <span class="dot" onclick="goToSlide(3)"></span>
                 </div>
+
+                <!-- Continue Button on Mobile -->
+                <button class="continue-mobile-btn" onclick="scrollToLoginForm()">
+                    Continue
+                </button>
             </div>
         </div>
 
@@ -298,6 +303,13 @@
             clearInterval(slideInterval);
             showSlide(index);
             slideInterval = setInterval(nextSlide, 5000);
+        }
+
+        function scrollToLoginForm() {
+            const rightPanel = document.querySelector('.right-panel');
+            if (rightPanel) {
+                rightPanel.scrollIntoView({ behavior: 'smooth' });
+            }
         }
 
         document.addEventListener("DOMContentLoaded", () => {
