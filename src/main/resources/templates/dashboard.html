@@ -159,7 +159,7 @@
                 <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
                     <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;" id="adminFormTitle" th:text="${isSuperAdmin} ? '➕ Thêm Đối Tác (Chủ Chuỗi Mới)' : '➕ Thêm Admin Chi Nhánh'">➕ Thêm Đối Tác / Admin Chi Nhánh</h4>
                     <input type="hidden" id="editAdminId">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="grid-2-col" style="margin-bottom: 12px;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;" th:text="${isSuperAdmin} ? 'Họ tên chủ chuỗi (Đối tác)' : 'Họ tên admin chi nhánh'">Họ tên đối tác</label>
                             <input type="text" id="adminName" class="form-input" placeholder="Ví dụ: Nguyễn Văn A..." style="padding: 8px 12px;">
@@ -169,7 +169,7 @@
                             <input type="email" id="adminEmail" class="form-input" placeholder="Ví dụ: partner1@liteflow.com..." style="padding: 8px 12px;">
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="grid-2-col" style="margin-bottom: 12px;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Mật khẩu</label>
                             <input type="password" id="adminPassword" class="form-input" placeholder="Bỏ trống nếu không đổi..." style="padding: 8px 12px;">
@@ -185,7 +185,7 @@
                         <input type="hidden" id="adminBranchId" th:if="${isSuperAdmin}" value="_NEW_">
                         <input type="hidden" id="adminRoleName" value="ADMIN">
                     </div>
-                    <div id="newBranchFields" th:style="${isSuperAdmin} ? 'display: grid; grid-template-columns: 1fr 2fr 2fr 1fr; gap: 12px; margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);' : 'display: none; grid-template-columns: 1fr 2fr 2fr 1fr; gap: 12px; margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);'">
+                    <div id="newBranchFields" class="grid-branch-fields" th:style="${isSuperAdmin} ? 'display: grid;' : 'display: none;'">
                         <div style="grid-column: span 4; font-size: 13px; font-weight: 600; color: #a5b4fc; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
                             🏢 <span th:text="${isSuperAdmin} ? 'Thông tin chi nhánh đầu tiên của chuỗi (Bắt buộc)' : 'Thông tin chi nhánh mới'">Thông tin chi nhánh mới</span>
                         </div>
