@@ -38,6 +38,11 @@
             box-shadow: 0 15px 25px rgba(239, 68, 68, 0.4);
         }
 
+        .portal-action-buttons {
+            display: flex;
+            gap: 16px;
+        }
+
         /* Mobile Responsive HR Portal */
         @media (max-width: 768px) {
             .portal-grid {
@@ -48,5 +53,22 @@
                 width: 130px;
                 height: 130px;
                 font-size: 18px;
+            }
+            .portal-action-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .portal-action-buttons .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .clock-panel {
+                padding: 20px 16px;
+            }
+            #clockDisplay {
+                font-size: 32px !important;
             }
         }

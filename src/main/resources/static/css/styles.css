@@ -526,6 +526,28 @@ body {
     background: rgba(255, 255, 255, 0.08);
 }
 
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9997;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+}
+
 /* Tablet & Mobile Breakpoint (1024px) */
 @media (max-width: 1024px) {
     .mobile-top-bar {
@@ -611,6 +633,11 @@ body {
     
     .main-content {
         padding: 14px;
+    }
+    
+    .modal-box {
+        padding: 20px 16px;
+        border-radius: 16px;
     }
 }
 

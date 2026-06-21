@@ -16,52 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.appendChild(container);
     }
 
-    // Dynamic Mobile Hamburger Navigation Drawer Builder
-    const sidebar = document.querySelector(".sidebar");
-    if (sidebar) {
-        // Create mobile top bar
-        const mobileTopBar = document.createElement("div");
-        mobileTopBar.className = "mobile-top-bar";
-        
-        // Find brand logo and name
-        const brandLogo = sidebar.querySelector(".brand-icon")?.outerHTML || `<div class="brand-icon" style="width:32px; height:32px; font-size:16px;">LF</div>`;
-        const brandName = sidebar.querySelector(".brand-name")?.outerHTML || `<div class="brand-name" style="font-size:18px;">LiteFlow POS</div>`;
-        
-        mobileTopBar.innerHTML = `
-            <button class="hamburger-btn" id="mobile-hamburger-trigger">☰</button>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                ${brandLogo}
-                ${brandName}
-            </div>
-            <div style="width: 40px; display: flex; justify-content: flex-end;">
-                <div class="avatar" style="width: 32px; height: 32px; font-size: 13px; margin:0;">LF</div>
-            </div>
-        `;
-        
-        // Prepend to body
-        document.body.insertBefore(mobileTopBar, document.body.firstChild);
-        
-        // Hamburger click listener
-        const trigger = document.getElementById("mobile-hamburger-trigger");
-        trigger.addEventListener("click", (e) => {
-            e.stopPropagation();
-            sidebar.classList.toggle("active");
-        });
-        
-        // Close menu when clicking outside sidebar
-        document.addEventListener("click", (e) => {
-            if (sidebar.classList.contains("active") && !sidebar.contains(e.target) && e.target !== trigger) {
-                sidebar.classList.remove("active");
-            }
-        });
 
-        // Close sidebar when clicking any navigation link
-        sidebar.querySelectorAll(".nav-menu a").forEach(link => {
-            link.addEventListener("click", () => {
-                sidebar.classList.remove("active");
-            });
-        });
-    }
 });
 
 window.showToast = function(message, type = 'info', duration = 3500) {

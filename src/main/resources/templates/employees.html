@@ -2,6 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Employee Portal - LiteFlow</title>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
     <link rel="stylesheet" th:href="@{/css/employees.css}">
@@ -10,29 +11,7 @@
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <div class="sidebar">
-            <div>
-                <div class="brand">
-                    <div class="brand-icon">LF</div>
-                    <div class="brand-name">LiteFlow POS</div>
-                </div>
-                <ul class="nav-menu">
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')"><a th:href="@{/dashboard}">📊 Báo Cáo</a></li>
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')"><a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a></li>
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')"><a th:href="@{/kds}">🍳 Màn Hình Bếp</a></li>
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')"><a th:href="@{/schedule}">📅 Lịch Làm Việc</a></li>
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')"><a th:href="@{/procurement}">📦 Thu Mua (PO)</a></li>
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')"><a th:href="@{/inventory}">🪵 Quản Lý Kho</a></li>
-                    <li class="nav-item active" sec:authorize="isAuthenticated()"><a th:href="@{/employees}">👤 Chấm Công</a></li>
-                    <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')"><a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a></li>
-                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='branchAdmins')}" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Đối Tác Chi Nhánh</a></li>
-                    <li class="nav-item" th:if="${isAdmin}"><a th:href="@{/dashboard(open='bankSettings')}">💳 Cấu hình Ngân hàng</a></li>
-                </ul>
-            </div>
-            <form th:action="@{/logout}" method="post">
-                <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
-            </form>
-        </div>
+        <div th:replace="~{fragments/navbar :: sidebar('employees')}"></div>
 
         <!-- Main Content -->
         <div class="main-content">
@@ -56,8 +35,10 @@
                     </div>
                 </div>
                 <div class="user-profile">
-                    <div class="avatar" th:text="${employee != null ? #strings.substring(employee.user.name, 0, 2).toUpperCase() : 'EM'}">EM</div>
-                    <span th:text="${employee != null ? employee.user.name : 'Nhân viên'}">Nhân viên</span>
+                    <a th:href="@{/profile}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; cursor: pointer;">
+                        <div class="avatar" th:text="${currentUser != null ? #strings.substring(currentUser.name, 0, 2).toUpperCase() : 'US'}">US</div>
+                        <span th:text="${currentUser != null ? currentUser.name : 'Nhân viên'}">Nhân viên</span>
+                    </a>
                 </div>
             </div>
 
@@ -100,7 +81,7 @@
                 <!-- Requests and lists column -->
                 <div style="display: flex; flex-direction: column; gap: 24px;">
                     <!-- Request buttons -->
-                    <div class="glass-panel" style="display: flex; gap: 16px;">
+                    <div class="glass-panel portal-action-buttons">
                         <button class="btn btn-primary" onclick="openLeaveModal()">
                             📝 Gửi Đơn Xin Nghỉ Phép
                         </button>

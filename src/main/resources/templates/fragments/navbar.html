@@ -1,0 +1,105 @@
+<div th:fragment="sidebar(activePage)" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+    <!-- Mobile Top Bar -->
+    <div class="mobile-top-bar">
+        <button class="hamburger-btn" onclick="toggleMobileSidebar()">☰</button>
+        <div class="brand" style="margin-bottom: 0;">
+            <div class="brand-icon" style="width: 32px; height: 32px; font-size: 16px; box-shadow: none;">LF</div>
+            <div class="brand-name" style="font-size: 18px;">LiteFlow POS</div>
+        </div>
+        <div style="width: 36px;"></div> <!-- Spacer to center title -->
+    </div>
+
+    <!-- Sidebar Mobile Backdrop Overlay -->
+    <div class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div>
+            <div class="brand">
+                <div class="brand-icon">LF</div>
+                <div class="brand-name">LiteFlow POS</div>
+            </div>
+            <ul class="nav-menu">
+                <li th:class="${activePage == 'dashboard' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER')">
+                    <a th:href="@{/dashboard}">📊 Báo Cáo</a>
+                </li>
+                <li th:class="${activePage == 'pos' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE', 'KITCHEN', 'CHEF')">
+                    <a th:href="@{/pos}">🛋️ Sơ Đồ Bàn / Gọi Món</a>
+                </li>
+                <li th:class="${activePage == 'kds' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'KITCHEN', 'CHEF')">
+                    <a th:href="@{/kds}">🍳 Màn Hình Bếp</a>
+                </li>
+                <li th:class="${activePage == 'schedule' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR', 'EMPLOYEE', 'CASHIER', 'CHEF')">
+                    <a th:href="@{/schedule}">📅 Lịch Làm Việc</a>
+                </li>
+                <li th:class="${activePage == 'procurement' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'PROCUREMENT')">
+                    <a th:href="@{/procurement}">📦 Thu Mua (PO)</a>
+                </li>
+                <li th:class="${activePage == 'inventory' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE', 'CHEF')">
+                    <a th:href="@{/inventory}">🪵 Quản Lý Kho</a>
+                </li>
+                <li th:class="${activePage == 'employees' ? 'nav-item active' : 'nav-item'}" sec:authorize="isAuthenticated()">
+                    <a th:href="@{/employees}">👤 Chấm Công</a>
+                </li>
+                <li th:class="${activePage == 'hr-management' ? 'nav-item active' : 'nav-item'}" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'HR')">
+                    <a th:href="@{/hr-management}">👥 Quản Lý Nhân Sự</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasAnyRole('ADMIN', 'MANAGER', 'CASHIER')">
+                    <a href="#" onclick="if(typeof openOrderLogsModal === 'function') { openOrderLogsModal(); } else { window.location.href='/dashboard?open=orderLogs'; }">📋 Nhật Ký Gọi Món</a>
+                </li>
+                <li class="nav-item" th:if="${isAdmin}">
+                    <a href="#" onclick="if(typeof openBranchAdminManager === 'function') { openBranchAdminManager(); } else { window.location.href='/dashboard?open=branchAdmins'; }" th:text="${isSuperAdmin} ? '👥 Quản Lý Đối Tác' : '👥 Quản Lý Chi Nhánh'">👥 Chi Nhánh & Đối Tác</a>
+                </li>
+                <li class="nav-item" th:if="${isAdmin}">
+                    <a href="#" onclick="if(typeof openBankSettingsModal === 'function') { openBankSettingsModal(); } else { window.location.href='/dashboard?open=bankSettings'; }">💳 Cấu hình Ngân hàng</a>
+                </li>
+                <li th:class="${activePage == 'profile' ? 'nav-item active' : 'nav-item'}" sec:authorize="isAuthenticated()">
+                    <a th:href="@{/profile}">👤 Hồ Sơ Cá Nhân</a>
+                </li>
+            </ul>
+        </div>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="logout-btn">🚪 Đăng Xuất</button>
+        </form>
+    </div>
+
+    <!-- Toggle script -->
+    <script>
+        function toggleMobileSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (sidebar) sidebar.classList.toggle('active');
+            if (overlay) overlay.classList.toggle('active');
+        }
+
+        // Handle clicks outside the sidebar or on nav links
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            
+            // Close sidebar when clicking any navigation link (like modal triggers)
+            if (sidebar) {
+                sidebar.querySelectorAll('.nav-menu a').forEach(link => {
+                    link.addEventListener('click', () => {
+                        sidebar.classList.remove('active');
+                        if (overlay) overlay.classList.remove('active');
+                    });
+                });
+            }
+
+            // Close sidebar when clicking outside the sidebar, the hamburger button, or the overlay
+            document.addEventListener('click', (e) => {
+                if (sidebar && sidebar.classList.contains('active')) {
+                    const isClickInsideSidebar = sidebar.contains(e.target);
+                    const isClickOnHamburger = e.target.closest('.hamburger-btn');
+                    const isClickOnOverlay = e.target.closest('.sidebar-overlay');
+                    
+                    if (!isClickInsideSidebar && !isClickOnHamburger && !isClickOnOverlay) {
+                        sidebar.classList.remove('active');
+                        if (overlay) overlay.classList.remove('active');
+                    }
+                }
+            });
+        });
+    </script>
+</div>
